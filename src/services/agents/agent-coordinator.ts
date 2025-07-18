@@ -9,6 +9,7 @@ import {
 } from './itinerary-optimization-agent';
 import { ChatMessage } from '../../models/chat';
 import { TripRepository } from '../../models/trip';
+import { agentSessionService, AgentSessionLogEntry, AgentSessionLogFilter } from './agent-session-service';
 
 export interface AgentSession {
   id: string;
@@ -120,12 +121,23 @@ export class AgentCoordinator {
     this.activeSessions.set(sessionId, session);
 
     try {
+      // Create persistent session record
+      await agentSessionService.createSession(session, input.workflowType || 'full_optimization', input);
+      await this.logSessionActivity(sessionId, 'info', 'Starting optimization workflow', 'AgentCoordinator', 'initialization', {
+        tripId: input.tripId,
+        workflowType: input.workflowType,
+        options: input.options
+      });
+
       console.log(`[AgentCoordinator] Starting optimization workflow for trip ${input.tripId}`);
 
       // Step 1: Requirement Analysis (25% progress)
       session.currentStep = 'requirement_analysis';
       session.progress = 25;
       this.activeSessions.set(sessionId, session);
+      await agentSessionService.updateSession(session);
+
+      await this.logSessionActivity(sessionId, 'info', 'Starting requirement analysis', 'AgentCoordinator', 'requirement_analysis');
 
       const context: AgentContext = {
         tripId: input.tripId,
@@ -146,6 +158,11 @@ export class AgentCoordinator {
       session.results.requirements = requirementResult.data;
       session.progress = 50;
       this.activeSessions.set(sessionId, session);
+      await agentSessionService.updateSession(session);
+
+      await this.logSessionActivity(sessionId, 'info', 'Requirement analysis completed', 'RequirementAnalysisAgent', 'requirement_analysis', {
+        extractedRequirements: requirementResult.data
+      });
 
       // Step 2: Get trip destinations and create constraints (60% progress)
       session.currentStep = 'constraint_preparation';
@@ -159,9 +176,14 @@ export class AgentCoordinator {
 
       session.progress = 75;
       this.activeSessions.set(sessionId, session);
+      await agentSessionService.updateSession(session);
 
       // Step 3: Itinerary Optimization (75-95% progress)
       session.currentStep = 'itinerary_optimization';
+      await this.logSessionActivity(sessionId, 'info', 'Starting itinerary optimization', 'AgentCoordinator', 'itinerary_optimization', {
+        destinationCount: destinations.length,
+        constraints
+      });
       
       const optimizationInput: ItineraryOptimizationInput = {
         requirements: requirementResult.data,
@@ -183,6 +205,11 @@ export class AgentCoordinator {
       session.results.optimizedItinerary = optimizationResult.data;
       session.progress = 95;
       this.activeSessions.set(sessionId, session);
+      await agentSessionService.updateSession(session);
+
+      await this.logSessionActivity(sessionId, 'info', 'Itinerary optimization completed', 'ItineraryOptimizationAgent', 'itinerary_optimization', {
+        optimizedItinerary: optimizationResult.data
+      });
 
       // Step 4: Generate recommendations and finalize (100% progress)
       session.currentStep = 'finalization';
@@ -200,6 +227,12 @@ export class AgentCoordinator {
       session.endTime = new Date();
       session.progress = 100;
       this.activeSessions.set(sessionId, session);
+      await agentSessionService.updateSession(session);
+
+      await this.logSessionActivity(sessionId, 'info', 'Workflow completed successfully', 'AgentCoordinator', 'finalization', {
+        recommendationCount: recommendations.length,
+        warningCount: warnings.length
+      });
 
       const processingTime = Date.now() - startTime;
       const confidence = Math.min(requirementResult.confidence, optimizationResult.confidence);
@@ -224,6 +257,13 @@ export class AgentCoordinator {
       session.endTime = new Date();
       session.errors.push(errorMessage);
       this.activeSessions.set(sessionId, session);
+      await agentSessionService.updateSession(session);
+
+      await this.logSessionActivity(sessionId, 'error', `Workflow failed: ${errorMessage}`, 'AgentCoordinator', session.currentStep, undefined, {
+        code: 'WORKFLOW_FAILED',
+        stack: error instanceof Error ? error.stack : undefined,
+        details: { error: errorMessage }
+      });
 
       console.error(`[AgentCoordinator] Optimization failed for trip ${input.tripId}:`, error);
 
@@ -308,12 +348,20 @@ export class AgentCoordinator {
   /**
    * Cancel an active session
    */
-  cancelSession(sessionId: string): boolean {
+  async cancelSession(sessionId: string): Promise<boolean> {
     const session = this.activeSessions.get(sessionId);
     if (session && session.status === 'active') {
       session.status = 'cancelled';
       session.endTime = new Date();
       this.activeSessions.set(sessionId, session);
+      
+      try {
+        await agentSessionService.updateSession(session);
+        await this.logSessionActivity(sessionId, 'info', 'Session cancelled by user', 'AgentCoordinator', session.currentStep);
+      } catch (error) {
+        console.error('Failed to update cancelled session in database:', error);
+      }
+      
       return true;
     }
     return false;
@@ -330,15 +378,31 @@ export class AgentCoordinator {
   /**
    * Get session logs for debugging
    */
-  getSessionLogs(sessionId: string): Array<{
-    timestamp: Date;
-    level: 'info' | 'warn' | 'error';
-    message: string;
-    details?: any;
+  async getSessionLogs(sessionId: string, filter?: AgentSessionLogFilter): Promise<{
+    logs: AgentSessionLogEntry[];
+    totalCount: number;
+    hasMore: boolean;
   }> {
-    // For now, return empty array as we don't have a logging system implemented
-    // In a production system, this would return actual session logs
-    return [];
+    return await agentSessionService.getSessionLogs(sessionId, filter);
+  }
+
+  /**
+   * Log session activity
+   */
+  private async logSessionActivity(
+    sessionId: string,
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+    component?: string,
+    step?: string,
+    metadata?: Record<string, any>,
+    errorDetails?: any
+  ): Promise<void> {
+    try {
+      await agentSessionService.addLog(sessionId, level, message, component, step, metadata, errorDetails);
+    } catch (error) {
+      console.error('Failed to log session activity:', error);
+    }
   }
 
   /**
@@ -360,19 +424,28 @@ export class AgentCoordinator {
   /**
    * Force cleanup of old sessions
    */
-  cleanupOldSessions(maxAgeHours: number = 24): number {
+  async cleanupOldSessions(maxAgeHours: number = 24): Promise<number> {
+    // Clean up in-memory sessions
     const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
-    let cleanedCount = 0;
+    let cleanedMemoryCount = 0;
     
     for (const [sessionId, session] of this.activeSessions.entries()) {
       if (session.startTime < cutoffTime && 
           (session.status === 'completed' || session.status === 'failed' || session.status === 'cancelled')) {
         this.activeSessions.delete(sessionId);
-        cleanedCount++;
+        cleanedMemoryCount++;
       }
     }
     
-    return cleanedCount;
+    // Clean up persistent sessions
+    let cleanedDbCount = 0;
+    try {
+      cleanedDbCount = await agentSessionService.cleanupOldSessions(maxAgeHours);
+    } catch (error) {
+      console.error('Failed to cleanup database sessions:', error);
+    }
+    
+    return cleanedMemoryCount + cleanedDbCount;
   }
 
   // Private helper methods
