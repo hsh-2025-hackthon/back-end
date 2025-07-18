@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/hsh-2025-hackthon/back-end#readme",
   "devDependencies": {
+    "@types/express": "^5.0.3",
     "@types/node": "^24.0.14",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
@@ -33,6 +34,7 @@
     "@azure/service-bus": "^7.9.5",
     "@azure/web-pubsub": "^1.2.0",
     "express": "^5.1.0",
+    "openai": "^5.10.1",
     "pg": "^8.16.3"
   }
 }

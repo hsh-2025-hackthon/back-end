@@ -17,11 +17,16 @@ export const searchDestinations = async (searchText: string, embedding: number[]
     const client = getSearchClient();
 
     const results = await client.search(searchText, {
-        vectorQueries: [{
-            vector: embedding,
-            k: 10,
-            fields: ['embedding']
-        }]
+        vectorSearchOptions: {
+            queries: [
+                {
+                    kind: "vector",
+                    vector: embedding,
+                    kNearestNeighborsCount: 10,
+                    fields: ['embedding']
+                }
+            ]
+        }
     });
 
     return results;
