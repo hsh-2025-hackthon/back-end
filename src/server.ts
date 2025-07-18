@@ -20,6 +20,9 @@ import expensesRouter from './api/routes/expenses';
 import mcpRouter from './api/routes/mcp';
 import notificationsRouter from './api/routes/notifications';
 import healthRouter from './api/routes/health';
+import quickActionsRouter from './api/routes/quick-actions';
+import bookingRouter from './api/routes/booking';
+import smartCardsRouter from './api/routes/smart-cards';
 
 // Middleware
 app.use(express.json());
@@ -110,6 +113,9 @@ app.use('/api', votesRouter);
 app.use('/api', expensesRouter);
 app.use('/api/mcp', mcpRouter);
 app.use('/api', notificationsRouter);
+app.use('/api/trips', quickActionsRouter);
+app.use('/api/trips', smartCardsRouter);
+app.use('/api/booking', bookingRouter);
 app.use('/health', healthRouter);
 
 

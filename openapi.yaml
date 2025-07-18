@@ -474,6 +474,105 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Itinerary'
+  /trips/{tripId}/smart-cards:
+    get:
+      summary: Get smart itinerary cards
+      description: Retrieves enriched itinerary cards with real-time data for a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Smart itinerary cards with enriched data.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  tripId:
+                    type: string
+                  totalCards:
+                    type: integer
+                  cards:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ItineraryCard'
+                  generatedAt:
+                    type: string
+                    format: date-time
+  /trips/{tripId}/smart-cards/{cardId}/refresh:
+    post:
+      summary: Refresh smart card data
+      description: Refreshes enriched data for a specific itinerary card.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Refreshed smart card data.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  cardId:
+                    type: string
+                  card:
+                    $ref: '#/components/schemas/ItineraryCard'
+                  refreshedAt:
+                    type: string
+                    format: date-time
+  /trips/{tripId}/smart-cards/summary:
+    get:
+      summary: Get smart cards summary
+      description: Retrieves a summary of all smart cards for a trip with analytics.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Smart cards summary and analytics.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  tripId:
+                    type: string
+                  summary:
+                    $ref: '#/components/schemas/SmartCardsSummary'
+                  generatedAt:
+                    type: string
+                    format: date-time
   /trips/{tripId}/chat/rooms:
     get:
       summary: Get chat rooms for a trip
@@ -1392,6 +1491,83 @@ paths:
                 $ref: '#/components/schemas/RoutePlanResponse'
         '400':
           description: Invalid route planning data.
+  /mcp/travel/recommendations:
+    get:
+      summary: Get travel recommendations
+      description: Retrieves travel recommendations based on various criteria.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [attraction, restaurant, activity]
+      responses:
+        '200':
+          description: List of travel recommendations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TravelRecommendation'
+  /mcp/travel/restaurants:
+    get:
+      summary: Get restaurant recommendations
+      description: Retrieves restaurant recommendations for a given location.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: location
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: cuisine
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of restaurant recommendations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RestaurantRecommendation'
+  /mcp/travel/activities:
+    get:
+      summary: Get activity recommendations
+      description: Retrieves activity recommendations for a given location and date.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: location
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of activity recommendations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActivityRecommendation'
   /booking/flights/search:
     post:
       summary: Search for flight options
@@ -1470,6 +1646,35 @@ paths:
           description: Booking confirmed.
         '302':
           description: Redirect to external booking provider.
+  /booking/providers/status:
+    get:
+      summary: Get booking providers status
+      description: Retrieves the health status and availability of all booking providers.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Booking providers status information.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  providers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProviderStatus'
+                  summary:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      available:
+                        type: integer
+                      unavailable:
+                        type: integer
   /users/me/notifications:
     get:
       summary: Get all notifications for the user
@@ -1850,6 +2055,71 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
+    TravelRecommendation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [attraction, restaurant, activity]
+        location:
+          type: string
+        rating:
+          type: number
+          format: float
+        imageUrl:
+          type: string
+          format: uri
+    RestaurantRecommendation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        cuisine:
+          type: string
+        address:
+          type: string
+        rating:
+          type: number
+          format: float
+        priceRange:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+    ActivityRecommendation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+          format: time
+        price:
+          type: number
+          format: float
+        imageUrl:
+          type: string
+          format: uri
     Trip:
       type: object
       properties:
@@ -2896,6 +3166,203 @@ components:
         - timestamp
         - summary
         - services
+    ItineraryCard:
+      type: object
+      properties:
+        id:
+          type: string
+        tripId:
+          type: string
+        type:
+          type: string
+          enum: [destination, activity, transport, accommodation, meal]
+        title:
+          type: string
+        description:
+          type: string
+        basicInfo:
+          type: object
+          properties:
+            date:
+              type: string
+              format: date-time
+            startTime:
+              type: string
+            endTime:
+              type: string
+            duration:
+              type: string
+            location:
+              type: object
+              properties:
+                name:
+                  type: string
+                address:
+                  type: string
+                coordinates:
+                  type: object
+                  properties:
+                    lat:
+                      type: number
+                    lng:
+                      type: number
+            status:
+              type: string
+              enum: [planned, confirmed, completed, cancelled]
+        enrichedData:
+          type: object
+          properties:
+            weather:
+              type: object
+              properties:
+                current:
+                  type: object
+                  properties:
+                    temperature:
+                      type: number
+                    condition:
+                      type: string
+                    icon:
+                      type: string
+                    humidity:
+                      type: number
+                    windSpeed:
+                      type: number
+                recommendation:
+                  type: string
+            pricing:
+              type: object
+              properties:
+                exchangeRate:
+                  type: object
+                  properties:
+                    localCurrency:
+                      type: string
+                    rate:
+                      type: number
+                    convertedPrice:
+                      type: number
+                    baseCurrency:
+                      type: string
+            transport:
+              type: object
+              properties:
+                toLocation:
+                  type: object
+                  properties:
+                    method:
+                      type: string
+                    duration:
+                      type: string
+                    distance:
+                      type: string
+            operatingHours:
+              type: object
+              properties:
+                today:
+                  type: object
+                  properties:
+                    open:
+                      type: string
+                    close:
+                      type: string
+                    isOpen:
+                      type: boolean
+            lastUpdated:
+              type: string
+              format: date-time
+        actions:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              type:
+                type: string
+                enum: [navigation, booking, sharing, modification, information]
+              label:
+                type: string
+              action:
+                type: string
+              enabled:
+                type: boolean
+        metadata:
+          type: object
+          properties:
+            priority:
+              type: string
+              enum: [low, medium, high]
+            tags:
+              type: array
+              items:
+                type: string
+            createdBy:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+    SmartCardsSummary:
+      type: object
+      properties:
+        totalCards:
+          type: integer
+        cardsByType:
+          type: object
+          additionalProperties:
+            type: integer
+        cardsByStatus:
+          type: object
+          additionalProperties:
+            type: integer
+        upcomingCards:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              title:
+                type: string
+              date:
+                type: string
+                format: date-time
+              startTime:
+                type: string
+              type:
+                type: string
+        alertsCount:
+          type: integer
+        dataFreshness:
+          type: object
+          properties:
+            oldest:
+              type: number
+            newest:
+              type: number
+            averageAge:
+              type: number
+    ProviderStatus:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [flight, hotel, activity]
+        available:
+          type: boolean
+        lastChecked:
+          type: string
+          format: date-time
+      required:
+        - name
+        - type
+        - available
+        - lastChecked
     ErrorResponse:
       type: object
       properties:
