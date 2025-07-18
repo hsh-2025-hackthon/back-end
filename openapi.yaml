@@ -218,6 +218,34 @@ paths:
       responses:
         '204':
           description: Collaborator removed.
+  /trips/{tripId}/route-plan:
+    post:
+      summary: Plan a route for a trip's destinations
+      description: Calculates an optimized route based on a list of coordinates for a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoutePlanRequest'
+      responses:
+        '200':
+          description: Route plan successfully generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutePlanResponse'
+        '400':
+          description: Invalid route planning data.
   /ai/itinerary:
     post:
       summary: Generate an itinerary with AI
@@ -377,6 +405,1282 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WebPubSubToken'
+  /trips/{tripId}/members:
+    post:
+      summary: Add a member to a trip
+      description: Adds a member to a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                role:
+                  type: string
+                  enum: [member, admin]
+      responses:
+        '200':
+          description: Member added successfully.
+  /trips/{tripId}/members/{userId}:
+    delete:
+      summary: Remove a member from a trip
+      description: Removes a member from a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Member removed successfully.
+  /trips/{tripId}/itinerary:
+    get:
+      summary: Get trip itinerary
+      description: Retrieves the detailed itinerary for a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Trip itinerary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Itinerary'
+  /trips/{tripId}/chat/rooms:
+    get:
+      summary: Get chat rooms for a trip
+      description: Retrieves a list of chat rooms for a specific trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of chat rooms.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatRoom'
+    post:
+      summary: Create a new chat room
+      description: Creates a new chat room for a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Chat room created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatRoom'
+  /chat/rooms/{roomId}:
+    put:
+      summary: Update a chat room
+      description: Updates an existing chat room.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Chat room updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatRoom'
+    delete:
+      summary: Delete a chat room
+      description: Deletes a chat room.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Chat room deleted successfully.
+  /chat/rooms/{roomId}/messages:
+    get:
+      summary: Get messages from a chat room
+      description: Retrieves messages from a specific chat room.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          description: Maximum number of messages to retrieve.
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          description: Offset for pagination.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of chat messages.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatMessage'
+    post:
+      summary: Send a new message to a chat room
+      description: Sends a new message to a chat room.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                message_type:
+                  type: string
+                  enum: [text, system, ai_suggestion, vote]
+                metadata:
+                  type: object
+      responses:
+        '201':
+          description: Message sent successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessage'
+  /chat/messages/{messageId}:
+    put:
+      summary: Edit an existing message
+      description: Edits an existing message.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Message updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessage'
+    delete:
+      summary: Delete a message
+      description: Deletes a message.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Message deleted successfully.
+  /chat/rooms/{roomId}/members:
+    get:
+      summary: Get members in a chat room
+      description: Retrieves a list of members in a chat room.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of chat room members.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatRoomMember'
+    post:
+      summary: Add a member to a chat room
+      description: Adds a member to a chat room.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                role:
+                  type: string
+                  enum: [member, admin, viewer]
+      responses:
+        '200':
+          description: Member added successfully.
+  /chat/rooms/{roomId}/members/{userId}:
+    delete:
+      summary: Remove a member from a chat room
+      description: Removes a member from a chat room.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Member removed successfully.
+  /trips/{tripId}/votes:
+    post:
+      summary: Create a new vote for a trip
+      description: Creates a new vote for a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Vote'
+      responses:
+        '201':
+          description: Vote created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vote'
+    get:
+      summary: Get all votes for a trip
+      description: Retrieves all active and past votes for a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of votes.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vote'
+  /votes/{voteId}:
+    get:
+      summary: Get a specific vote
+      description: Retrieves details of a specific vote.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: voteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Vote details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vote'
+  /votes/{voteId}/responses:
+    post:
+      summary: Submit a user's response to a vote
+      description: Submits a user's response to a vote.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: voteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoteResponse'
+      responses:
+        '201':
+          description: Vote response submitted successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoteResponse'
+  /votes/{voteId}/results:
+    get:
+      summary: Get vote results
+      description: Retrieves the current results of a vote.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: voteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Vote results.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoteResults'
+  /trips/{tripId}/expenses:
+    get:
+      summary: Get all expenses for a trip
+      description: Retrieves all expense records for a specific trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of expenses.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Expense'
+    post:
+      summary: Create a new expense record
+      description: Creates a new expense record for a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewExpense'
+      responses:
+        '201':
+          description: Expense created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+  /expenses/{expenseId}:
+    put:
+      summary: Update an expense record
+      description: Updates an existing expense record.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewExpense'
+      responses:
+        '200':
+          description: Expense updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+    delete:
+      summary: Delete an expense record
+      description: Deletes an expense record.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Expense deleted successfully.
+  /expenses/{expenseId}/receipt:
+    post:
+      summary: Upload a receipt image for OCR processing
+      description: Uploads a receipt image for OCR processing and associates it with an expense.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Receipt processed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptData'
+  /trips/{tripId}/splits:
+    get:
+      summary: Get all split expense records for a trip
+      description: Retrieves all split expense records for a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of split expenses.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExpenseSplit'
+  /expenses/{expenseId}/split:
+    post:
+      summary: Calculate and create split records for an expense
+      description: Calculates and creates split records for a given expense.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                splitMethod:
+                  type: string
+                  enum: [equal, percentage, custom]
+                participants:
+                  type: array
+                  items:
+                    type: string
+                splitData:
+                  type: object
+      responses:
+        '201':
+          description: Split records created successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExpenseSplit'
+  /splits/{splitId}/status:
+    put:
+      summary: Update the status of a split record
+      description: Updates the status of a specific split record (e.g., from 'pending' to 'paid').
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: splitId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [pending, paid, cancelled]
+      responses:
+        '200':
+          description: Split status updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseSplit'
+  /trips/{tripId}/balances:
+    get:
+      summary: Get member balances for a trip
+      description: Retrieves the current balances (who owes whom) for all members in a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Member balances.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balances'
+  /trips/{tripId}/budget:
+    get:
+      summary: Get budget settings for a trip
+      description: Retrieves the budget settings and current spending for a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Budget details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Budget'
+    put:
+      summary: Update budget settings for a trip
+      description: Updates the budget settings for a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewBudget'
+      responses:
+        '200':
+          description: Budget updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Budget'
+  /trips/{tripId}/budget/alerts:
+    get:
+      summary: Get budget alerts for a trip
+      description: Retrieves any active budget alerts for a trip (e.g., nearing limit).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of budget alerts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BudgetAlert'
+  /trips/{tripId}/ai/generate-itinerary:
+    post:
+      summary: Trigger AI to generate or refine a trip itinerary
+      description: Triggers the AI to generate or refine a trip itinerary based on current trip data and user preferences.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                preferences:
+                  type: object
+                constraints:
+                  type: object
+      responses:
+        '202':
+          description: Itinerary generation accepted.
+  /trips/{tripId}/ai/recommend-destinations:
+    post:
+      summary: Request AI recommendations for destinations
+      description: Requests AI recommendations for destinations based on trip context.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                context:
+                  type: object
+      responses:
+        '200':
+          description: List of recommended destinations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecommendedDestination'
+  /trips/{tripId}/ai/recommend-activities:
+    post:
+      summary: Request AI recommendations for activities
+      description: Requests AI recommendations for activities within a specific destination or itinerary day.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                destination:
+                  type: string
+                date:
+                  type: string
+                  format: date
+                context:
+                  type: object
+      responses:
+        '200':
+          description: List of recommended activities.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecommendedActivity'
+  /trips/{tripId}/ai/analyze-chat:
+    post:
+      summary: Analyze recent chat messages for travel intentions
+      description: Analyzes recent chat messages for travel intentions and extracts key information.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: Extracted travel intentions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractedInfo'
+  /mcp/weather:
+    get:
+      summary: Get weather data
+      description: Retrieves weather data for a given location.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: location
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Weather data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeatherData'
+  /mcp/exchange-rates:
+    get:
+      summary: Get exchange rates
+      description: Retrieves current exchange rates between two currencies.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Exchange rate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeRate'
+  /mcp/places/search:
+    get:
+      summary: Search for places
+      description: Searches for places (attractions, restaurants, hotels) based on a query.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: location
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of places.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlaceData'
+  /mcp/places/{placeId}/details:
+    get:
+      summary: Get place details
+      description: Retrieves detailed information for a specific place.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Place details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceData'
+  /booking/flights/search:
+    post:
+      summary: Search for flight options
+      description: Searches for flight options across multiple providers.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlightSearchRequest'
+      responses:
+        '200':
+          description: List of flight search results.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FlightSearchResult'
+  /booking/hotels/search:
+    post:
+      summary: Search for hotel options
+      description: Searches for hotel options across multiple providers.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HotelSearchRequest'
+      responses:
+        '200':
+          description: List of hotel search results.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HotelSearchResult'
+  /booking/{bookingId}/details:
+    get:
+      summary: Get booking details
+      description: Retrieves details of a specific booking (flight or hotel).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Booking details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingDetails'
+  /booking/{bookingId}/confirm:
+    post:
+      summary: Confirm a booking
+      description: Confirms a booking. This might trigger a redirect to an external booking provider.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Booking confirmed.
+        '302':
+          description: Redirect to external booking provider.
+  /users/me/notifications:
+    get:
+      summary: Get all notifications for the user
+      description: Retrieves all notifications for the authenticated user.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of notifications.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+  /notifications/{notificationId}/read:
+    put:
+      summary: Mark a notification as read
+      description: Marks a specific notification as read.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notification marked as read.
+  /users/me/notification-settings:
+    put:
+      summary: Update user notification settings
+      description: Updates the notification settings for the authenticated user.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserNotificationSettings'
+      responses:
+        '200':
+          description: Notification settings updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserNotificationSettings'
+  /trips/{tripId}/quick-actions/suggest-itinerary:
+    post:
+      summary: Trigger AI to suggest an itinerary
+      description: Triggers AI to suggest an itinerary based on current trip context.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Itinerary suggestion accepted.
+  /trips/{tripId}/quick-actions/add-destination:
+    post:
+      summary: Quickly add a destination to the trip itinerary
+      description: Quickly adds a destination to the trip itinerary.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                destinationName:
+                  type: string
+                date:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: Destination added.
+  /trips/{tripId}/quick-actions/split-expense:
+    post:
+      summary: Initiate an expense split for a trip
+      description: Initiates an expense split for a trip.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expenseId:
+                  type: string
+                method:
+                  type: string
+      responses:
+        '200':
+          description: Expense split initiated.
+  /trips/{tripId}/quick-actions/get-weather:
+    post:
+      summary: Get current weather for the trip's destination
+      description: Retrieves current weather for the trip's destination.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Weather data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeatherData'
+  /trips/{tripId}/quick-actions/export-itinerary:
+    post:
+      summary: Trigger the export of the trip itinerary
+      description: Triggers the export of the trip itinerary (e.g., to PDF).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Itinerary export accepted.
+  /trips/{tripId}/quick-actions/create-vote:
+    post:
+      summary: Quickly create a new vote in the trip's chat
+      description: Quickly creates a new vote in the trip's chat.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                options:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '201':
+          description: Vote created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vote'
+  /trips/{tripId}/export/pdf:
+    get:
+      summary: Generate and provide a PDF export of the trip itinerary
+      description: Generates and provides a PDF export of the trip itinerary.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: PDF file.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+  /trips/{tripId}/expenses/export/csv:
+    get:
+      summary: Generate and provide a CSV export of the trip's expense report
+      description: Generates and provides a CSV export of the trip's expense report.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: CSV file.
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
 components:
   schemas:
     Trip:
@@ -395,14 +1699,20 @@ components:
         endDate:
           type: string
           format: date-time
-        destinations:
-          type: array
-          items:
-            $ref: '#/components/schemas/Destination'
-        collaborators:
-          type: array
-          items:
-            $ref: '#/components/schemas/Collaborator'
+        destination:
+          type: string
+        createdBy:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [planning, active, completed]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     NewTrip:
       type: object
       properties:
@@ -460,6 +1770,63 @@ components:
         role:
           type: string
           enum: [editor, viewer]
+    RoutePlanRequest:
+      type: object
+      required:
+        - coordinates
+      properties:
+        coordinates:
+          type: array
+          description: Array of [longitude, latitude] pairs representing waypoints.
+          items:
+            type: array
+            items:
+              type: number
+            minItems: 2
+            maxItems: 2
+        travelMode:
+          type: string
+          enum: [car, truck, taxi, bus, van, motorcycle, bicycle, pedestrian]
+          default: car
+          description: The mode of travel for route calculation.
+    RoutePlanResponse:
+      type: object
+      properties:
+        routes:
+          type: array
+          items:
+            type: object
+            properties:
+              summary:
+                type: object
+                properties:
+                  lengthInMeters:
+                    type: number
+                  travelTimeInSeconds:
+                    type: number
+                  trafficDelayInSeconds:
+                    type: number
+              legs:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    summary:
+                      type: object
+                      properties:
+                        lengthInMeters:
+                          type: number
+                        travelTimeInSeconds:
+                          type: number
+                    points:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          latitude:
+                            type: number
+                          longitude:
+                            type: number
     AIGenerateItineraryRequest:
       type: object
       properties:
@@ -517,11 +1884,13 @@ components:
         id:
           type: string
           format: uuid
-        name:
+        username:
           type: string
         email:
           type: string
           format: email
+        profilePictureUrl:
+          type: string
         createdAt:
           type: string
           format: date-time
@@ -550,6 +1919,654 @@ components:
         email:
           type: string
           format: email
+    ChatRoom:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        roomId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        content:
+          type: string
+        messageType:
+          type: string
+          enum: [text, system, ai_suggestion, vote]
+        metadata:
+          type: object
+        repliedTo:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ChatRoomMember:
+      type: object
+      properties:
+        roomId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [admin, member, viewer]
+        joinedAt:
+          type: string
+          format: date-time
+        lastReadAt:
+          type: string
+          format: date-time
+    Vote:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        chatMessageId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        voteType:
+          type: string
+          enum: [destination, restaurant, activity, budget]
+        options:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              description:
+                type: string
+        creatorId:
+          type: string
+          format: uuid
+        deadline:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active, closed, cancelled]
+        createdAt:
+          type: string
+          format: date-time
+    VoteResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        voteId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        selectedOptions:
+          type: array
+          items:
+            type: string
+        comment:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    VoteResults:
+      type: object
+      properties:
+        voteId:
+          type: string
+          format: uuid
+        results:
+          type: object
+          additionalProperties:
+            type: integer
+    Expense:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        amount:
+          type: number
+          format: float
+        currency:
+          type: string
+        amountBaseCurrency:
+          type: number
+          format: float
+        category:
+          type: string
+          enum: [transportation, food, accommodation, activity, shopping, other]
+        subcategory:
+          type: string
+        description:
+          type: string
+        receiptImageUrl:
+          type: string
+        receiptData:
+          type: object
+        location:
+          type: object
+        expenseDate:
+          type: string
+          format: date
+        participants:
+          type: array
+          items:
+            type: string
+        splitMethod:
+          type: string
+          enum: [equal, percentage, custom, none]
+        splitData:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    NewExpense:
+      type: object
+      properties:
+        title:
+          type: string
+        amount:
+          type: number
+          format: float
+        currency:
+          type: string
+        category:
+          type: string
+        expenseDate:
+          type: string
+          format: date
+        participants:
+          type: array
+          items:
+            type: string
+        splitMethod:
+          type: string
+        splitData:
+          type: object
+    ReceiptData:
+      type: object
+      properties:
+        merchant:
+          type: string
+        total:
+          type: number
+        currency:
+          type: string
+        date:
+          type: string
+          format: date
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              quantity:
+                type: number
+              price:
+                type: number
+        tax:
+          type: number
+        confidence:
+          type: number
+    ExpenseSplit:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        expenseId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: float
+        currency:
+          type: string
+        amountBaseCurrency:
+          type: number
+          format: float
+        paidByUserId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, paid, cancelled]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Balances:
+      type: object
+      additionalProperties:
+        type: object
+        properties:
+          owes:
+            type: string
+            format: uuid
+          amount:
+            type: number
+            format: float
+    Budget:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        category:
+          type: string
+        totalAmount:
+          type: number
+          format: float
+        currency:
+          type: string
+        spentAmount:
+          type: number
+          format: float
+        alertThreshold:
+          type: number
+          format: float
+        createdBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    NewBudget:
+      type: object
+      properties:
+        category:
+          type: string
+        totalAmount:
+          type: number
+          format: float
+        currency:
+          type: string
+        alertThreshold:
+          type: number
+          format: float
+    BudgetAlert:
+      type: object
+      properties:
+        type:
+          type: string
+        message:
+          type: string
+        currentAmount:
+          type: number
+        budgetLimit:
+          type: number
+    Itinerary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        days:
+          type: array
+          items:
+            type: object
+            properties:
+              day:
+                type: integer
+              date:
+                type: string
+                format: date
+              activities:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    time:
+                      type: string
+                    activity:
+                      type: string
+                    location:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        coordinates:
+                          type: array
+                          items:
+                            type: number
+                    cost:
+                      type: number
+                    currency:
+                      type: string
+    ExtractedInfo:
+      type: object
+      properties:
+        destinations:
+          type: array
+          items:
+            type: string
+        dates:
+          type: array
+          items:
+            type: string
+            format: date
+        budget:
+          type: number
+        interests:
+          type: array
+          items:
+            type: string
+        preferences:
+          type: object
+        mentions:
+          type: object
+    WeatherData:
+      type: object
+      properties:
+        current:
+          type: object
+          properties:
+            temperature:
+              type: number
+            humidity:
+              type: number
+            description:
+              type: string
+            icon:
+              type: string
+        forecast:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              maxTemp:
+                type: number
+              minTemp:
+                type: number
+              description:
+                type: string
+    ExchangeRate:
+      type: object
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        rate:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+    PlaceData:
+      type: object
+      properties:
+        placeId:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        coordinates:
+          type: object
+          properties:
+            lat:
+              type: number
+            lng:
+              type: number
+        rating:
+          type: number
+        reviews:
+          type: number
+        photos:
+          type: array
+          items:
+            type: string
+        openingHours:
+          type: array
+          items:
+            type: object
+        priceLevel:
+          type: number
+        types:
+          type: array
+          items:
+            type: string
+    FlightSearchRequest:
+      type: object
+      properties:
+        origin:
+          type: string
+        destination:
+          type: string
+        departureDate:
+          type: string
+          format: date
+        returnDate:
+          type: string
+          format: date
+        passengers:
+          type: integer
+        class:
+          type: string
+          enum: [economy, business, first]
+        budget:
+          type: number
+    FlightSearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+        airline:
+          type: string
+        flightNumber:
+          type: string
+        departureTime:
+          type: string
+          format: date-time
+        arrivalTime:
+          type: string
+          format: date-time
+        price:
+          type: number
+        currency:
+          type: string
+        bookingUrl:
+          type: string
+    HotelSearchRequest:
+      type: object
+      properties:
+        destination:
+          type: string
+        checkIn:
+          type: string
+          format: date
+        checkOut:
+          type: string
+          format: date
+        rooms:
+          type: integer
+        guests:
+          type: integer
+        budget:
+          type: number
+        amenities:
+          type: array
+          items:
+            type: string
+    HotelSearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        rating:
+          type: number
+        price:
+          type: number
+        currency:
+          type: string
+        bookingUrl:
+          type: string
+    BookingDetails:
+      type: object
+      properties:
+        bookingId:
+          type: string
+        type:
+          type: string
+          enum: [flight, hotel]
+        status:
+          type: string
+        details:
+          type: object
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        type:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        data:
+          type: object
+        channels:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [pending, sent, failed, read]
+        scheduledAt:
+          type: string
+          format: date-time
+        sentAt:
+          type: string
+          format: date-time
+        readAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    UserNotificationSettings:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        notificationType:
+          type: string
+        enabled:
+          type: boolean
+        channels:
+          type: array
+          items:
+            type: string
+        advanceMinutes:
+          type: integer
+    RecommendedDestination:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        rating:
+          type: number
+        imageUrl:
+          type: string
+    RecommendedActivity:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+        cost:
+          type: number
+        currency:
+          type: string
+        imageUrl:
+          type: string
   securitySchemes:
     bearerAuth:
       type: http

@@ -79,7 +79,7 @@ Agent Workflow Pipeline:
 ### 6. 外部資料整合 (MCP)
 
 **地圖與路線 MCP**
-- Google Maps API：景點資訊、評價、開放時間
+- Azure Maps API：景點資訊、評價、開放時間、路線規劃
 - 路線規劃：最佳化交通時間與成本
 - 即時交通狀況
 
