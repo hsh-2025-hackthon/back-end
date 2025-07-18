@@ -365,4 +365,17 @@ export class TripRepository {
       destinations
     };
   }
+
+  // Check if user has access to trip
+  static async checkTripAccess(tripId: string, userId: string): Promise<boolean> {
+    const db = getDatabase();
+    const query = `
+      SELECT 1 FROM trips t
+      LEFT JOIN trip_collaborators tc ON t.id = tc.trip_id
+      WHERE t.id = $1 AND (t.created_by = $2 OR tc.user_id = $2)
+      LIMIT 1
+    `;
+    const result = await db.query(query, [tripId, userId]);
+    return result.rows.length > 0;
+  }
 }

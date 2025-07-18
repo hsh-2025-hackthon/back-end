@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth';
 import { TripRepository } from '../../models/trip';
 import { TripCommands } from '../../features/trips/trip-commands';
 import { z } from 'zod';
+import { calculateRoute } from '../../lib/azure-maps';
 
 const router = Router();
 
@@ -27,6 +28,11 @@ const NewDestinationSchema = z.object({
 const CollaboratorSchema = z.object({
   email: z.string().email(),
   role: z.enum(['editor', 'viewer']),
+});
+
+const RoutePlanSchema = z.object({
+  coordinates: z.array(z.array(z.number()).length(2)), // Array of [longitude, latitude] pairs
+  travelMode: z.enum(["car", "truck", "taxi", "bus", "van", "motorcycle", "bicycle", "pedestrian"]).optional(),
 });
 
 // Get all trips for the user
@@ -187,6 +193,23 @@ router.delete('/:tripId/collaborators/:userId', requireAuth, async (req: Request
   } catch (error) {
     console.error('Error removing collaborator:', error);
     res.status(500).json({ message: 'Failed to remove collaborator' });
+  }
+});
+
+// Plan a route for a trip's destinations
+router.post('/:tripId/route-plan', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { coordinates, travelMode } = RoutePlanSchema.parse(req.body);
+    // In a real application, you might want to verify that these coordinates belong to the trip's destinations
+    // For now, we'll just calculate the route based on the provided coordinates.
+    const route = await calculateRoute(coordinates, travelMode);
+    res.json(route);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid route planning data', errors: error.issues });
+    }
+    console.error('Error planning route:', error);
+    res.status(500).json({ message: 'Failed to plan route' });
   }
 });
 

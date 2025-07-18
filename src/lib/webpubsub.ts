@@ -24,27 +24,27 @@ export const getWebPubSubAccessToken = async (tripId: string, userId: string) =>
 // Chat-specific WebSocket functions
 export const broadcastToChatRoom = async (roomId: string, message: any) => {
   const client = getWebPubSubServiceClient();
-  await client.sendToGroup(`chat_${roomId}`, message);
+  await client.group(`chat_${roomId}`).sendToAll(message);
 };
 
 export const broadcastToTrip = async (tripId: string, message: any) => {
   const client = getWebPubSubServiceClient();
-  await client.sendToGroup(tripId, message);
+  await client.group(tripId).sendToAll(message);
 };
 
 export const addUserToGroup = async (userId: string, groupName: string) => {
   const client = getWebPubSubServiceClient();
-  await client.addUserToGroup(groupName, userId);
+  await client.group(groupName).addUser(userId);
 };
 
 export const removeUserFromGroup = async (userId: string, groupName: string) => {
   const client = getWebPubSubServiceClient();
-  await client.removeUserFromGroup(groupName, userId);
+  await client.group(groupName).removeUser(userId);
 };
 
 export const notifyUserTyping = async (roomId: string, userId: string, isTyping: boolean) => {
   const client = getWebPubSubServiceClient();
-  await client.sendToGroup(`chat_${roomId}`, {
+  await client.group(`chat_${roomId}`).sendToAll({
     type: 'user_typing',
     data: {
       userId,
@@ -56,7 +56,7 @@ export const notifyUserTyping = async (roomId: string, userId: string, isTyping:
 
 export const notifyUserPresence = async (roomId: string, userId: string, isOnline: boolean) => {
   const client = getWebPubSubServiceClient();
-  await client.sendToGroup(`chat_${roomId}`, {
+  await client.group(`chat_${roomId}`).sendToAll({
     type: 'user_presence',
     data: {
       userId,

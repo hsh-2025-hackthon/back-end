@@ -4,7 +4,7 @@
 
 This project aims to develop a collaborative travel planning AI system. The backend focuses on real-time collaboration, AI-powered recommendations, multi-user interactions, and robust third-party integrations, leveraging Azure services.
 
-**Current Status (as of 2025-07-18):**
+**Current Status (as of 2025-07-19):**
 
 *   **Completed Features:**
     *   Core Trip Management (CRUD)
@@ -15,9 +15,11 @@ This project aims to develop a collaborative travel planning AI system. The back
     *   Chat Room System & NLP Parsing
     *   Voting & Quick Actions
     *   **Smart Budget Management System** (including expense tracking, multi-currency, split calculation, budget alerts, receipt management, OCR integration point, debt settlement, real-time collaboration, and full REST API).
-*   **Completed Features:**
-    *   External Service Integration (MCP Layer)
-    *   Notification Reminder System
+    *   **External Service Integration (MCP Layer)** - Weather, Maps, Exchange Rate, and Travel Info services with unified API
+    *   **Notification Reminder System** - Multi-channel notification delivery with email, push, and WebSocket support
+    *   **Comprehensive Service Health Monitoring**
+*   **In Progress:**
+*   **In Progress:**
     *   Quick Actions & Command System
     *   Flight & Hotel Booking Integration
     *   Smart Itinerary Card System
@@ -102,27 +104,31 @@ The implementation is structured into four main phases, aligning with the 4-week
 
 **Key Features & Components:**
 
-1.  **External Service Integration (MCP Layer)** (In Progress - 40% complete)
+1.  **External Service Integration (MCP Layer)** (Completed ✅)
     *   **Objective:** Provide a unified interface for various external APIs (weather, maps, travel info).
-    *   **Components:** `BaseMCP` abstract class, `MCPManager`, `WeatherMCP`, `MapsMCP`, `TravelInfoMCP`.
+    *   **Components:** `BaseMCP` abstract class, `MCPManager`, `WeatherMCP`, `MapsMCP`, `TravelInfoMCP`, `ExchangeRateMCP`.
     *   **API Endpoints:**
         *   `GET /mcp/weather`
         *   `GET /mcp/exchange-rates`
         *   `GET /mcp/places/search`
         *   `GET /mcp/places/{placeId}/details`
-        *   `GET /mcp/routes/plan`
-    *   **Technologies:** Azure API Management, Azure Functions, OpenWeatherMap API, Azure Maps API, various travel info APIs.
+        *   `POST /mcp/routes/plan`
+        *   `GET /mcp/travel/recommendations`
+        *   `GET /mcp/travel/restaurants`
+        *   `GET /mcp/travel/activities`
+    *   **Technologies:** OpenWeatherMap API, Azure Maps API, ExchangeRate API, TripAdvisor API.
 
-2.  **Notification Reminder System** (In Progress - 30% complete)
+2.  **Notification Reminder System** (Completed ✅)
     *   **Objective:** Deliver timely alerts and reminders to users via multiple channels.
     *   **Components:**
         *   **Database:** `notification_templates`, `user_notification_settings`, `notifications` tables.
-        *   **Services:** `NotificationService` for scheduling and sending, `PushNotificationService` for multi-platform push.
+        *   **Services:** `NotificationService` for scheduling and sending, `PushNotificationService` for multi-platform push, `EmailService` for email delivery.
     *   **API Endpoints:**
         *   `GET /users/me/notifications`
         *   `PUT /notifications/{notificationId}/read`
         *   `PUT /users/me/notification-settings`
-    *   **Technologies:** PostgreSQL, Azure Web PubSub, Firebase Cloud Messaging, Apple Push Notification Service (APNS).
+        *   `GET /users/me/notification-stats`
+    *   **Technologies:** Firebase Cloud Messaging (FCM), Email service integration, Azure Web PubSub, templated notifications.
 
 ---
 

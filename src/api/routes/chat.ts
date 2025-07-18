@@ -18,8 +18,8 @@ const CreateRoomSchema = z.object({
 
 const SendMessageSchema = z.object({
   content: z.string().min(1).max(10000),
-  messageType: z.enum(['text', 'system', 'command']).optional(),
-  metadata: z.record(z.any()).optional(),
+  messageType: z.enum(['text', 'system', 'ai_suggestion', 'vote', 'command_result', 'expense_notification']).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
   repliedTo: z.string().uuid().optional()
 });
 

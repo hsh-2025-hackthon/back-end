@@ -14,6 +14,9 @@ import aiRouter from './api/routes/ai';
 import authRouter from './api/routes/auth';
 import chatRouter from './api/routes/chat';
 import votesRouter from './api/routes/votes';
+import expensesRouter from './api/routes/expenses';
+import mcpRouter from './api/routes/mcp';
+import notificationsRouter from './api/routes/notifications';
 
 // Middleware
 app.use(express.json());
@@ -49,6 +52,9 @@ app.use('/api/collaboration', collaborationRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api', chatRouter);
 app.use('/api', votesRouter);
+app.use('/api', expensesRouter);
+app.use('/api/mcp', mcpRouter);
+app.use('/api', notificationsRouter);
 
 
 // Error handling middleware

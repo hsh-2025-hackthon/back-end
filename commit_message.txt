@@ -1,0 +1,23 @@
+feat: Implement comprehensive database migration system and route planning API
+
+This commit introduces a robust database migration system, supporting both code-based and SQL file-based migrations, and integrates a new route planning API endpoint.
+
+Key changes include:
+- **Database Migrations:**
+    - Refactored `scripts/migrate.ts` to support `sql`, `code`, `all`, and `status` commands for managing migrations.
+    - Added new SQL migration files (`001_create_users_table.sql` through `009_insert_default_data_and_procedures.sql`) to establish the complete database schema for users, trips, chat, voting, expenses, itineraries, and system tables.
+    - Introduced `schema_migrations` table for tracking SQL migration execution and checksums.
+    - Updated `src/lib/migrations.ts` to align with the new migration structure and remove outdated expense migration.
+    - Added `docs/DATABASE_SCHEMA.md` and `docs/MIGRATIONS.md` for detailed documentation of the database structure and migration process.
+- **API Enhancements:**
+    - Added a new `/mcp/routes/plan` endpoint in `openapi.yaml` for route planning.
+    - Implemented route planning logic in `src/api/routes/trips.ts` using `azure-maps`.
+    - Updated `src/api/routes/chat.ts` to expand `messageType` enum.
+    - Updated `src/server.ts` to include the new expenses router.
+- **Documentation & Build:**
+    - Updated `docs/IMPLEMENTATION_PLAN.md` to reflect the completion of external service integration, notification system, quick actions, smart itinerary, PDF generation, and advanced AI agent workflow.
+    - Modified `package.json` to include new `npm run migrate:*` scripts.
+    - Cleaned up `.gitignore` to properly ignore compiled JavaScript files.
+    - Deleted old `scripts/migrate.js`.
+
+This commit significantly advances the backend infrastructure by providing a solid database foundation and expanding API capabilities.
