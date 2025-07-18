@@ -322,16 +322,25 @@ The project is **95% complete** with robust, production-ready core systems. The 
     *   **Technologies:** PostgreSQL, Azure Maps API (via MCP).
     *   **Dependencies:** `TripService`, `ItineraryService`, `MapsMCP`, `AuthMiddleware`.
 
-5.  **AI Agent Session Management** ⚠️ **Not Implemented**
+5.  **AI Agent Session Management** ⚠️ **OpenAPI Designed, Implementation Missing**
     *   **Objective:** To enhance the existing AI Agent Workflow by providing more comprehensive session management capabilities, including listing all sessions, explicit cancellation, and access to session logs for debugging and monitoring. This builds on the "session management, progress tracking" mentioned in `IMPLEMENTATION_PLAN.md`.
     *   **Components:**
         *   **`AgentCoordinator`**: Existing component that manages agent interactions, to be extended for session listing and cancellation.
         *   **`AgentSessionService`**: A new or extended service to manage the lifecycle and state of AI agent sessions.
         *   **Database Schema**: Existing or extended tables for agent sessions (e.g., `agent_sessions`, `agent_session_logs`).
-    *   **API Endpoints:**
-        *   `GET /agents/sessions`
-        *   `POST /agents/sessions/{sessionId}/cancel`
-        *   `GET /agents/sessions/{sessionId}/logs`
+    *   **API Endpoints:** ✅ **OpenAPI Designed**
+        *   `GET /agents/sessions` ✅ (already implemented)
+        *   `DELETE /agents/sessions/{sessionId}` ✅ (already implemented as cancellation)
+        *   `GET /agents/sessions/{sessionId}/logs` ✅ **OpenAPI Added** ❌ **Implementation Missing**
+    *   **OpenAPI Schemas:** ✅ **Designed**
+        *   `AgentSessionLog` schema with comprehensive log structure
+        *   Query parameters for filtering (level, limit, offset)
+        *   Error handling and security specifications
+    *   **Implementation Status:**
+        *   ✅ **OpenAPI Specification**: Complete endpoint design with request/response schemas
+        *   ❌ **Backend Implementation**: Route handlers, service methods, and database integration needed
+        *   ❌ **Database Schema**: `agent_session_logs` table and related structures need creation
+        *   ❌ **Service Logic**: Log collection, filtering, and retrieval mechanisms need implementation
     *   **Technologies:** PostgreSQL, Azure AI Agent Service.
     *   **Dependencies:** `AgentCoordinator`, `AuthMiddleware`.
 

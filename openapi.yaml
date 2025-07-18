@@ -2173,6 +2173,74 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /agents/sessions/{sessionId}/logs:
+    get:
+      summary: Get session execution logs
+      description: Retrieves detailed execution logs and debugging information for a specific AI agent session.
+      tags:
+        - AI Agents
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: level
+          in: query
+          description: Filter logs by level (debug, info, warn, error)
+          required: false
+          schema:
+            type: string
+            enum: [debug, info, warn, error]
+        - name: limit
+          in: query
+          description: Maximum number of log entries to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+        - name: offset
+          in: query
+          description: Number of log entries to skip
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Session logs retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:
+                    type: string
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AgentSessionLog'
+                  totalCount:
+                    type: integer
+                  hasMore:
+                    type: boolean
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions to access session logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/expenses/export/csv:
     get:
       summary: Generate and provide a CSV export of the trip's expense report
@@ -4269,6 +4337,46 @@ components:
             type: string
         hasResults:
           type: boolean
+    AgentSessionLog:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique log entry identifier
+        timestamp:
+          type: string
+          format: date-time
+          description: When the log entry was created
+        level:
+          type: string
+          enum: [debug, info, warn, error]
+          description: Log level indicating severity
+        message:
+          type: string
+          description: Human-readable log message
+        component:
+          type: string
+          description: Component or agent that generated the log
+          example: "RequirementAnalysisAgent"
+        step:
+          type: string
+          description: Current processing step when log was generated
+          example: "extracting_travel_preferences"
+        metadata:
+          type: object
+          description: Additional structured data related to the log entry
+          additionalProperties: true
+        error:
+          type: object
+          description: Error details if this is an error log
+          properties:
+            code:
+              type: string
+            stack:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
     AgentInfo:
       type: object
       properties:
