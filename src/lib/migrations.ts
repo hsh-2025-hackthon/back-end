@@ -17,13 +17,13 @@ const migrations: Migration[] = [
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email VARCHAR(255) UNIQUE NOT NULL,
         name VARCHAR(255) NOT NULL,
-        azure_ad_id VARCHAR(255) UNIQUE,
+        google_id VARCHAR(255) UNIQUE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
       
       CREATE INDEX idx_users_email ON users(email);
-      CREATE INDEX idx_users_azure_ad_id ON users(azure_ad_id);
+      CREATE INDEX idx_users_google_id ON users(google_id);
     `,
     down: `DROP TABLE IF EXISTS users;`
   },

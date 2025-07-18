@@ -4,7 +4,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  azureAdId?: string;
+  googleId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -12,7 +12,7 @@ export interface User {
 export interface CreateUserData {
   name: string;
   email: string;
-  azureAdId?: string;
+  googleId?: string;
 }
 
 export interface UpdateUserData {
@@ -24,19 +24,19 @@ export class UserRepository {
   static async create(userData: CreateUserData): Promise<User> {
     const db = getDatabase();
     const query = `
-      INSERT INTO users (name, email, azure_ad_id)
+      INSERT INTO users (name, email, google_id)
       VALUES ($1, $2, $3)
-      RETURNING id, name, email, azure_ad_id as "azureAdId", created_at as "createdAt", updated_at as "updatedAt"
+      RETURNING id, name, email, google_id as "googleId", created_at as "createdAt", updated_at as "updatedAt"
     `;
     
-    const result = await db.query(query, [userData.name, userData.email, userData.azureAdId]);
+    const result = await db.query(query, [userData.name, userData.email, userData.googleId]);
     return result.rows[0];
   }
 
   static async findById(id: string): Promise<User | null> {
     const db = getDatabase();
     const query = `
-      SELECT id, name, email, azure_ad_id as "azureAdId", created_at as "createdAt", updated_at as "updatedAt"
+      SELECT id, name, email, google_id as "googleId", created_at as "createdAt", updated_at as "updatedAt"
       FROM users WHERE id = $1
     `;
     
@@ -47,7 +47,7 @@ export class UserRepository {
   static async findByEmail(email: string): Promise<User | null> {
     const db = getDatabase();
     const query = `
-      SELECT id, name, email, azure_ad_id as "azureAdId", created_at as "createdAt", updated_at as "updatedAt"
+      SELECT id, name, email, google_id as "googleId", created_at as "createdAt", updated_at as "updatedAt"
       FROM users WHERE email = $1
     `;
     
@@ -55,14 +55,14 @@ export class UserRepository {
     return result.rows[0] || null;
   }
 
-  static async findByAzureAdId(azureAdId: string): Promise<User | null> {
+  static async findByGoogleId(googleId: string): Promise<User | null> {
     const db = getDatabase();
     const query = `
-      SELECT id, name, email, azure_ad_id as "azureAdId", created_at as "createdAt", updated_at as "updatedAt"
-      FROM users WHERE azure_ad_id = $1
+      SELECT id, name, email, google_id as "googleId", created_at as "createdAt", updated_at as "updatedAt"
+      FROM users WHERE google_id = $1
     `;
     
-    const result = await db.query(query, [azureAdId]);
+    const result = await db.query(query, [googleId]);
     return result.rows[0] || null;
   }
 
@@ -91,7 +91,7 @@ export class UserRepository {
     const query = `
       UPDATE users SET ${fields.join(', ')}
       WHERE id = $${paramIndex}
-      RETURNING id, name, email, azure_ad_id as "azureAdId", created_at as "createdAt", updated_at as "updatedAt"
+      RETURNING id, name, email, google_id as "googleId", created_at as "createdAt", updated_at as "updatedAt"
     `;
     
     const result = await db.query(query, values);
@@ -108,7 +108,7 @@ export class UserRepository {
   static async findAll(limit: number = 50, offset: number = 0): Promise<User[]> {
     const db = getDatabase();
     const query = `
-      SELECT id, name, email, azure_ad_id as "azureAdId", created_at as "createdAt", updated_at as "updatedAt"
+      SELECT id, name, email, google_id as "googleId", created_at as "createdAt", updated_at as "updatedAt"
       FROM users 
       ORDER BY created_at DESC
       LIMIT $1 OFFSET $2

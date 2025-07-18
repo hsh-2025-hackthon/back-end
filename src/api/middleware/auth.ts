@@ -1,12 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import jwksClient from 'jwks-rsa';
+import { OAuth2Client } from 'google-auth-library';
 import { UserRepository } from '../../models/user';
 
-interface JwtPayload {
+interface GoogleTokenPayload {
   sub: string;
   email: string;
   name: string;
+  picture?: string;
+  email_verified?: boolean;
   iss: string;
   aud: string;
   exp: number;
@@ -16,37 +17,20 @@ interface JwtPayload {
 interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
-    azureAdId: string;
+    googleId: string;
     email: string;
     name: string;
   };
 }
 
-const getJwksClient = () => {
-  const tenantId = process.env.AZURE_AD_B2C_TENANT_ID || 'placeholder';
-  const policyName = process.env.AZURE_AD_B2C_POLICY_NAME || 'B2C_1_signupsignin1';
+const getGoogleOAuthClient = () => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
   
-  return jwksClient({
-    jwksUri: `https://${tenantId}.b2clogin.com/${tenantId}.onmicrosoft.com/${policyName}/discovery/v2.0/keys`,
-    cache: true,
-    cacheMaxEntries: 5,
-    cacheMaxAge: 600000 // 10 minutes
-  });
-};
-
-const getSigningKey = (header: any): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const client = getJwksClient();
-    
-    client.getSigningKey(header.kid, (err, key) => {
-      if (err) {
-        reject(err);
-      } else {
-        const signingKey = key?.getPublicKey();
-        resolve(signingKey || '');
-      }
-    });
-  });
+  if (!clientId) {
+    throw new Error('GOOGLE_CLIENT_ID environment variable is required');
+  }
+  
+  return new OAuth2Client(clientId);
 };
 
 export const validateJwt = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -63,63 +47,72 @@ export const validateJwt = async (req: AuthenticatedRequest, res: Response, next
       return res.status(401).json({ message: 'Token missing' });
     }
 
-    // Decode the token header to get the key id
-    const decodedHeader = jwt.decode(token, { complete: true });
-    
-    if (!decodedHeader || !decodedHeader.header.kid) {
-      return res.status(401).json({ message: 'Invalid token format' });
+    // Initialize Google OAuth client
+    const client = getGoogleOAuthClient();
+
+    // Verify the Google ID token
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+
+    if (!payload) {
+      return res.status(401).json({ message: 'Invalid token payload' });
     }
 
-    // Get the signing key
-    const signingKey = await getSigningKey(decodedHeader.header);
+    // Extract user information from the payload
+    const googleTokenPayload: GoogleTokenPayload = {
+      sub: payload.sub,
+      email: payload.email || '',
+      name: payload.name || '',
+      picture: payload.picture,
+      email_verified: payload.email_verified,
+      iss: payload.iss,
+      aud: payload.aud as string,
+      exp: payload.exp || 0,
+      iat: payload.iat || 0,
+    };
 
-    // Verify and decode the token
-    const decoded = jwt.verify(token, signingKey, {
-      algorithms: ['RS256']
-    }) as JwtPayload;
-
-    // Validate the issuer and audience
-    const expectedIssuer = `https://${process.env.AZURE_AD_B2C_TENANT_ID}.b2clogin.com/${process.env.AZURE_AD_B2C_TENANT_ID}.onmicrosoft.com/${process.env.AZURE_AD_B2C_POLICY_NAME}/v2.0/`;
-    const expectedAudience = process.env.AZURE_AD_B2C_CLIENT_ID;
-
-    if (decoded.iss !== expectedIssuer) {
-      return res.status(401).json({ message: 'Invalid token issuer' });
-    }
-
-    if (decoded.aud !== expectedAudience) {
-      return res.status(401).json({ message: 'Invalid token audience' });
+    // Validate email verification if required
+    if (!googleTokenPayload.email_verified) {
+      return res.status(401).json({ message: 'Email not verified' });
     }
 
     // Find or create user in database
-    let user = await UserRepository.findByAzureAdId(decoded.sub);
+    let user = await UserRepository.findByGoogleId(googleTokenPayload.sub);
     
     if (!user) {
       // Create user if doesn't exist
       user = await UserRepository.create({
-        name: decoded.name,
-        email: decoded.email,
-        azureAdId: decoded.sub
+        name: googleTokenPayload.name,
+        email: googleTokenPayload.email,
+        googleId: googleTokenPayload.sub
       });
     }
 
     // Attach user to request
     req.user = {
       id: user.id,
-      azureAdId: user.azureAdId!,
+      googleId: user.googleId!,
       email: user.email,
       name: user.name
     };
 
     next();
   } catch (error) {
-    console.error('JWT validation error:', error);
+    console.error('Google OAuth validation error:', error);
     
-    if (error instanceof jwt.TokenExpiredError) {
-      return res.status(401).json({ message: 'Token expired' });
-    }
-    
-    if (error instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({ message: 'Invalid token' });
+    // Handle Google Auth specific errors
+    if (error instanceof Error) {
+      if (error.message.includes('Token used too early') || error.message.includes('Token expired')) {
+        return res.status(401).json({ message: 'Token expired or invalid timing' });
+      }
+      
+      if (error.message.includes('Invalid token signature') || error.message.includes('Invalid token')) {
+        return res.status(401).json({ message: 'Invalid token' });
+      }
     }
     
     return res.status(500).json({ message: 'Internal server error during authentication' });
@@ -146,7 +139,7 @@ declare global {
     interface Request {
       user?: {
         id: string;
-        azureAdId: string;
+        googleId: string;
         email: string;
         name: string;
       };

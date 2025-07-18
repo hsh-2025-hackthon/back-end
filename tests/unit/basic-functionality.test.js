@@ -75,7 +75,7 @@ describe('Basic Functionality Tests', () => {
             expect(typeof user_1.UserRepository.create).toBe('function');
             expect(typeof user_1.UserRepository.findById).toBe('function');
             expect(typeof user_1.UserRepository.findByEmail).toBe('function');
-            expect(typeof user_1.UserRepository.findByAzureAdId).toBe('function');
+            expect(typeof user_1.UserRepository.findByGoogleId).toBe('function');
             expect(typeof user_1.UserRepository.update).toBe('function');
             expect(typeof user_1.UserRepository.delete).toBe('function');
             expect(typeof user_1.UserRepository.findAll).toBe('function');

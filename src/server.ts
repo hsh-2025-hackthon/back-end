@@ -11,6 +11,7 @@ import tripsRouter from './api/routes/trips';
 import usersRouter from './api/routes/users';
 import collaborationRouter from './api/routes/collaboration';
 import aiRouter from './api/routes/ai';
+import authRouter from './api/routes/auth';
 
 // Middleware
 app.use(express.json());
@@ -39,6 +40,7 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
+app.use('/api/auth', authRouter);
 app.use('/api/trips', tripsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/collaboration', collaborationRouter);

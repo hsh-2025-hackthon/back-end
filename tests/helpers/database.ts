@@ -20,14 +20,15 @@ export class DatabaseTestHelper {
       return;
     }
 
+    const environment: { [key: string]: string } = {
+      POSTGRES_DB: 'test_db',
+      POSTGRES_USER: 'test_user',
+      POSTGRES_PASSWORD: 'test_password',
+    };
+
     this.container = await new GenericContainer('postgres:15')
-      .withEnvironment({
-        POSTGRES_DB: 'test_db',
-        POSTGRES_USER: 'test_user',
-        POSTGRES_PASSWORD: 'test_password'
-      })
+      .withEnvironment(environment)
       .withExposedPorts(5432)
-      .withWaitStrategy(wait => wait.forLogMessage('database system is ready to accept connections'))
       .start();
 
     const host = this.container.getHost();
@@ -73,7 +74,8 @@ export class DatabaseTestHelper {
         id SERIAL PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
         name VARCHAR(255) NOT NULL,
-        azure_ad_id VARCHAR(255) UNIQUE NOT NULL,
+        azure_ad_id VARCHAR(255) UNIQUE,
+        google_id VARCHAR(255) UNIQUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -106,7 +108,7 @@ export class DatabaseTestHelper {
     // Create indexes
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-      CREATE INDEX IF NOT EXISTS idx_users_azure_ad_id ON users(azure_ad_id);
+      CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
       CREATE INDEX IF NOT EXISTS idx_trips_user_id ON trips(user_id);
       CREATE INDEX IF NOT EXISTS idx_trip_collaborators_trip_id ON trip_collaborators(trip_id);
       CREATE INDEX IF NOT EXISTS idx_trip_collaborators_user_id ON trip_collaborators(user_id);
@@ -126,10 +128,10 @@ export class DatabaseTestHelper {
     
     // Insert test users
     const userResult = await pool.query(`
-      INSERT INTO users (email, name, azure_ad_id) VALUES
-      ('user1@test.com', 'Test User 1', 'azure-1'),
-      ('user2@test.com', 'Test User 2', 'azure-2'),
-      ('user3@test.com', 'Test User 3', 'azure-3')
+      INSERT INTO users (email, name, google_id) VALUES
+      ('user1@test.com', 'Test User 1', 'google-1'),
+      ('user2@test.com', 'Test User 2', 'google-2'),
+      ('user3@test.com', 'Test User 3', 'google-3')
       RETURNING *
     `);
 
@@ -204,12 +206,12 @@ export async function createTestUser(data: Partial<any> = {}): Promise<any> {
   const userData = {
     email: data.email || `test-${Date.now()}@example.com`,
     name: data.name || 'Test User',
-    azure_ad_id: data.azure_ad_id || `azure-${Date.now()}`
+    google_id: data.google_id || `google-${Date.now()}`
   };
 
   const result = await pool.query(
-    'INSERT INTO users (email, name, azure_ad_id) VALUES ($1, $2, $3) RETURNING *',
-    [userData.email, userData.name, userData.azure_ad_id]
+    'INSERT INTO users (email, name, google_id) VALUES ($1, $2, $3) RETURNING *',
+    [userData.email, userData.name, userData.google_id]
   );
 
   return result.rows[0];
