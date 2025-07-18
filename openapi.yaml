@@ -246,61 +246,9 @@ paths:
                 $ref: '#/components/schemas/RoutePlanResponse'
         '400':
           description: Invalid route planning data.
-  /ai/itinerary:
-    post:
-      summary: Generate an itinerary with AI
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AIGenerateItineraryRequest'
-      responses:
-        '200':
-          description: AI-generated itinerary.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AIGeneratedItinerary'
-  /ai/recommendations:
-    post:
-      summary: Get AI-powered recommendations
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AIRecommendationsRequest'
-      responses:
-        '200':
-          description: AI-generated recommendations.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AIRecommendationsResponse'
-  /ai/enhance-trip/{tripId}:
-    post:
-      summary: Enhance a trip with AI suggestions
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: tripId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: AI-generated enhancements.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AIEnhancementsResponse'
+  
+  
+  
   /users/me:
     get:
       summary: Get current user profile
@@ -1258,131 +1206,9 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/BudgetAlert'
-  /trips/{tripId}/ai/generate-itinerary:
-    post:
-      summary: Trigger AI to generate or refine a trip itinerary
-      description: Triggers the AI to generate or refine a trip itinerary based on current trip data and user preferences.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: tripId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                preferences:
-                  type: object
-                constraints:
-                  type: object
-      responses:
-        '202':
-          description: Itinerary generation accepted.
-  /trips/{tripId}/ai/recommend-destinations:
-    post:
-      summary: Request AI recommendations for destinations
-      description: Requests AI recommendations for destinations based on trip context.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: tripId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                context:
-                  type: object
-      responses:
-        '200':
-          description: List of recommended destinations.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/RecommendedDestination'
-  /trips/{tripId}/ai/recommend-activities:
-    post:
-      summary: Request AI recommendations for activities
-      description: Requests AI recommendations for activities within a specific destination or itinerary day.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: tripId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                destination:
-                  type: string
-                date:
-                  type: string
-                  format: date
-                context:
-                  type: object
-      responses:
-        '200':
-          description: List of recommended activities.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/RecommendedActivity'
-  /trips/{tripId}/ai/analyze-chat:
-    post:
-      summary: Analyze recent chat messages for travel intentions
-      description: Analyzes recent chat messages for travel intentions and extracts key information.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: tripId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                messages:
-                  type: array
-                  items:
-                    type: object
-      responses:
-        '200':
-          description: Extracted travel intentions.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExtractedInfo'
+  
+  
+  
   /mcp/weather:
     get:
       summary: Get weather data
@@ -1811,22 +1637,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserNotificationSettings'
-  /trips/{tripId}/quick-actions/suggest-itinerary:
-    post:
-      summary: Trigger AI to suggest an itinerary
-      description: Triggers AI to suggest an itinerary based on current trip context.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: tripId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '202':
-          description: Itinerary suggestion accepted.
+  
   /trips/{tripId}/quick-actions/add-destination:
     post:
       summary: Quickly add a destination to the trip itinerary
@@ -1986,6 +1797,66 @@ paths:
           description: Trip not found
         '500':
           description: Optimization failed
+  /trips/{tripId}/agents/recommendations:
+    post:
+      summary: Request AI recommendations for a trip
+      description: Requests AI recommendations (destinations, activities, general) based on trip context and user preferences.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [destination, activity, general]
+                  description: Type of recommendation requested.
+                context:
+                  type: object
+                  description: Additional context for recommendations (e.g., current location, dates).
+                preferences:
+                  type: object
+                  description: User preferences to guide recommendations.
+              required:
+                - type
+      responses:
+        '200':
+          description: List of AI-generated recommendations.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  recommendations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        type:
+                          type: string
+                        description:
+                          type: string
+                        score:
+                          type: number
+                          format: float
+                        details:
+                          type: object
   /trips/{tripId}/agents/analyze-requirements:
     post:
       summary: Analyze travel requirements from chat messages
@@ -1998,6 +1869,25 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: Extracted travel intentions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractedInfo'
             format: uuid
       requestBody:
         required: true

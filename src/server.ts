@@ -24,6 +24,9 @@ import quickActionsRouter from './api/routes/quick-actions';
 import bookingRouter from './api/routes/booking';
 import smartCardsRouter from './api/routes/smart-cards';
 import agentsRouter from './api/routes/agents';
+import versionsRouter from './api/routes/versions';
+import permissionsRouter from './api/routes/permissions';
+import visualizationRouter from './api/routes/visualization';
 
 // Middleware
 app.use(express.json());
@@ -118,6 +121,9 @@ app.use('/api/trips', quickActionsRouter);
 app.use('/api/trips', smartCardsRouter);
 app.use('/api/booking', bookingRouter);
 app.use('/api', agentsRouter);
+app.use('/api', versionsRouter);  // Version control endpoints
+app.use('/api', permissionsRouter);  // Permission management endpoints
+app.use('/api', visualizationRouter);  // Visualization data endpoints
 app.use('/health', healthRouter);
 
 

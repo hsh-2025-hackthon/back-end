@@ -262,6 +262,81 @@ The project is **95% complete** with robust, production-ready core systems. The 
 
 ---
 
+#### **Phase 5: Core API Expansion** (Post-MVP)
+
+**Objective:** To enhance the system with advanced collaboration, versioning, and AI session management capabilities, addressing currently missing but critical API functionalities.
+
+**Key Features & Components:**
+
+1.  **Version Control Endpoints** ✅ **Implemented**
+    *   **Objective:** To provide users with the ability to track, view, and revert changes to trip itineraries, aligning with the "版本控制" (Version Control) feature outlined in `IDEA.md`. This builds upon the existing CRDT system by offering a higher-level, user-facing version history.
+    *   **Components:**
+        *   **`VersionService`**: A new service responsible for managing trip versions, including creating snapshots, retrieving historical versions, and performing reverts.
+        *   **`TripRepository`**: Existing repository to interact with the trip data, potentially extended to support version-aware operations.
+        *   **Database Schema**: May require new tables or extensions to existing ones to store version metadata and historical states (e.g., `trip_versions`, `version_snapshots`).
+    *   **API Endpoints:**
+        *   `GET /trips/{tripId}/versions`
+        *   `POST /trips/{tripId}/versions`
+        *   `GET /trips/{tripId}/versions/{versionId}`
+        *   `POST /trips/{tripId}/versions/{versionId}/revert`
+        *   `GET /trips/{tripId}/changes`
+        *   `POST /trips/{tripId}/changes/commit`
+    *   **Technologies:** PostgreSQL (for version metadata and potentially storing diffs/snapshots), existing CRDT implementation for underlying change tracking.
+    *   **Dependencies:** `TripService`, `AuthMiddleware`.
+
+2.  **Conflict Resolution Endpoints** ✅ **Implemented**
+    *   **Objective:** To provide a mechanism for users to view and resolve semantic conflicts that might arise during collaborative editing, even with CRDTs handling operational conflicts. This supports the "避免衝突與重工" (avoid conflicts and rework) aspect of version control.
+    *   **Components:**
+        *   **`ConflictService`**: A new service responsible for detecting, presenting, and resolving semantic conflicts.
+        *   **`CRDTService`**: Existing CRDT implementation, which might expose conflict information at a higher level.
+        *   **Database Schema**: New tables to store conflict details and resolution history (e.g., `trip_conflicts`).
+    *   **API Endpoints:**
+        *   `GET /trips/{tripId}/conflicts`
+        *   `GET /trips/{tripId}/conflicts/{conflictId}`
+        *   `POST /trips/{tripId}/conflicts/{conflictId}/resolve`
+    *   **Technologies:** PostgreSQL, existing CRDT implementation.
+    *   **Dependencies:** `TripService`, `AuthMiddleware`.
+
+3.  **Permission Management Endpoints** ✅ **Implemented**
+    *   **Objective:** To expose API endpoints for managing user roles and permissions within a trip, enabling the "角色權限" (Role Permissions) feature mentioned in `IDEA.md`. This complements the existing "User Authentication & Permission Management" by providing an API for dynamic role assignment.
+    *   **Components:**
+        *   **`PermissionService`**: A new service to handle the logic of assigning, updating, and revoking user permissions on trips.
+        *   **`UserRepository`**: Existing repository to retrieve user information.
+        *   **Database Schema**: Existing `trip_members` or similar tables that store user roles.
+    *   **API Endpoints:**
+        *   `GET /trips/{tripId}/permissions`
+        *   `PUT /trips/{tripId}/permissions/{userId}`
+        *   `DELETE /trips/{tripId}/permissions/{userId}`
+    *   **Technologies:** PostgreSQL.
+    *   **Dependencies:** `TripService`, `AuthMiddleware`.
+
+4.  **Visualization Data Endpoints** ✅ **Implemented**
+    *   **Objective:** To provide structured data specifically formatted for front-end visualization components, such as Gantt charts and interactive maps, as described in `IDEA.md` ("時程表可視化", "地圖標記景點路線").
+    *   **Components:**
+        *   **`VisualizationService`**: A new service responsible for aggregating and transforming trip data into formats suitable for visualization.
+        *   **`ItineraryService`**: Existing service to retrieve itinerary details.
+        *   **`MapsMCP`**: Existing MCP for map-related data.
+    *   **API Endpoints:**
+        *   `GET /trips/{tripId}/timeline`
+        *   `GET /trips/{tripId}/map-data`
+    *   **Technologies:** PostgreSQL, Azure Maps API (via MCP).
+    *   **Dependencies:** `TripService`, `ItineraryService`, `MapsMCP`, `AuthMiddleware`.
+
+5.  **AI Agent Session Management** ⚠️ **Not Implemented**
+    *   **Objective:** To enhance the existing AI Agent Workflow by providing more comprehensive session management capabilities, including listing all sessions, explicit cancellation, and access to session logs for debugging and monitoring. This builds on the "session management, progress tracking" mentioned in `IMPLEMENTATION_PLAN.md`.
+    *   **Components:**
+        *   **`AgentCoordinator`**: Existing component that manages agent interactions, to be extended for session listing and cancellation.
+        *   **`AgentSessionService`**: A new or extended service to manage the lifecycle and state of AI agent sessions.
+        *   **Database Schema**: Existing or extended tables for agent sessions (e.g., `agent_sessions`, `agent_session_logs`).
+    *   **API Endpoints:**
+        *   `GET /agents/sessions`
+        *   `POST /agents/sessions/{sessionId}/cancel`
+        *   `GET /agents/sessions/{sessionId}/logs`
+    *   **Technologies:** PostgreSQL, Azure AI Agent Service.
+    *   **Dependencies:** `AgentCoordinator`, `AuthMiddleware`.
+
+---
+
 ### Cross-Cutting Concerns
 
 *   **Backend Architecture:** Modular monolith with selective microservices (Azure Container Apps), Azure API Management as API Gateway, Azure Web PubSub for WebSockets, Azure Service Bus and Event Hubs for message queues, Event-driven architecture with selective CQRS.

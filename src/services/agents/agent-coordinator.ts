@@ -298,6 +298,14 @@ export class AgentCoordinator {
   }
 
   /**
+   * Get all active sessions for a user
+   */
+  getAllUserSessions(userId: string): AgentSession[] {
+    return Array.from(this.activeSessions.values())
+      .filter(session => session.userId === userId);
+  }
+
+  /**
    * Cancel an active session
    */
   cancelSession(sessionId: string): boolean {
@@ -309,6 +317,62 @@ export class AgentCoordinator {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Get all active sessions across all users (admin functionality)
+   */
+  getAllActiveSessions(): AgentSession[] {
+    return Array.from(this.activeSessions.values())
+      .filter(session => session.status === 'active');
+  }
+
+  /**
+   * Get session logs for debugging
+   */
+  getSessionLogs(sessionId: string): Array<{
+    timestamp: Date;
+    level: 'info' | 'warn' | 'error';
+    message: string;
+    details?: any;
+  }> {
+    // For now, return empty array as we don't have a logging system implemented
+    // In a production system, this would return actual session logs
+    return [];
+  }
+
+  /**
+   * Get session results if completed
+   */
+  getSessionResults(sessionId: string): any {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) {
+      return null;
+    }
+    
+    if (session.status !== 'completed') {
+      return null;
+    }
+    
+    return session.results;
+  }
+
+  /**
+   * Force cleanup of old sessions
+   */
+  cleanupOldSessions(maxAgeHours: number = 24): number {
+    const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
+    let cleanedCount = 0;
+    
+    for (const [sessionId, session] of this.activeSessions.entries()) {
+      if (session.startTime < cutoffTime && 
+          (session.status === 'completed' || session.status === 'failed' || session.status === 'cancelled')) {
+        this.activeSessions.delete(sessionId);
+        cleanedCount++;
+      }
+    }
+    
+    return cleanedCount;
   }
 
   // Private helper methods
