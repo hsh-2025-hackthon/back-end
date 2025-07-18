@@ -1,17 +1,24 @@
 import { AzureOpenAI } from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 
-const endpoint = process.env.AZURE_OPENAI_ENDPOINT || "https://placeholder.openai.azure.com/";
-const azureApiKey = process.env.AZURE_OPENAI_KEY || "placeholder";
+const getEndpoint = (): string => {
+  return process.env.AZURE_OPENAI_ENDPOINT || "https://placeholder.openai.azure.com/";
+};
+
+const getApiKey = (): string => {
+  return process.env.AZURE_OPENAI_KEY || "placeholder";
+};
 
 let client: AzureOpenAI;
 
-export const getOpenAIClient = () => {
+export const getOpenAIClient = (): AzureOpenAI => {
     if (!client) {
-        client = new AzureOpenAI({ endpoint, apiKey: azureApiKey, apiVersion: "2024-05-01-preview" });
+        const endpoint = getEndpoint();
+        const apiKey = getApiKey();
+        client = new AzureOpenAI({ endpoint, apiKey, apiVersion: "2024-05-01-preview" });
     }
     return client;
-}
+};
 
 export const generateItinerary = async (destination: string, duration: number) => {
     const client = getOpenAIClient();

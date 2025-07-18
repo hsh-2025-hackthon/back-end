@@ -25,13 +25,13 @@ async function testAllConnections() {
     console.log(`   Cosmos DB: ❌ Failed - ${error}\n`);
   }
 
-  // Test Key Vault connection
-  console.log('3. Testing Key Vault connection...');
+  // Test environment variables (replaced Key Vault)
+  console.log('3. Testing environment variables...');
   try {
     const kvConnected = await testKeyVaultConnection();
-    console.log(`   Key Vault: ${kvConnected ? '✅ Connected' : '❌ Failed'}\n`);
+    console.log(`   Environment variables: ${kvConnected ? '✅ Available' : '❌ Missing'}\n`);
   } catch (error) {
-    console.log(`   Key Vault: ❌ Failed - ${error}\n`);
+    console.log(`   Environment variables: ❌ Failed - ${error}\n`);
   }
 
   console.log('Connection tests completed!');

@@ -1,119 +1,50 @@
-import { SecretClient } from '@azure/keyvault-secrets';
-import { DefaultAzureCredential } from '@azure/identity';
+// Environment-based secret management
+// Replaced Azure Key Vault with direct environment variable access
 
-interface KeyVaultConfig {
-  vaultUrl: string;
-}
-
-const getKeyVaultConfig = (): KeyVaultConfig => {
-  return {
-    vaultUrl: process.env.AZURE_KEYVAULT_URL || 'https://placeholder-keyvault.vault.azure.net/'
-  };
-};
-
-let secretClient: SecretClient;
-
-export const getKeyVaultClient = (): SecretClient => {
-  if (!secretClient) {
-    const config = getKeyVaultConfig();
-    const credential = new DefaultAzureCredential();
-    
-    secretClient = new SecretClient(config.vaultUrl, credential);
-  }
-  
-  return secretClient;
-};
-
-export const getSecret = async (secretName: string): Promise<string | undefined> => {
-  try {
-    const client = getKeyVaultClient();
-    const secret = await client.getSecret(secretName);
-    return secret.value;
-  } catch (error) {
-    console.error(`Failed to get secret ${secretName} from Key Vault:`, error);
-    return undefined;
-  }
-};
-
-export const setSecret = async (secretName: string, secretValue: string): Promise<void> => {
-  try {
-    const client = getKeyVaultClient();
-    await client.setSecret(secretName, secretValue);
-    console.log(`Secret ${secretName} set successfully`);
-  } catch (error) {
-    console.error(`Failed to set secret ${secretName} in Key Vault:`, error);
-    throw error;
-  }
-};
-
-// Utility function to get connection strings from Key Vault
-export const getConnectionString = async (serviceName: string): Promise<string> => {
-  const secretName = `${serviceName}-connection-string`;
-  const connectionString = await getSecret(secretName);
+// Utility function to get connection strings from environment variables
+export const getConnectionString = (serviceName: string): string => {
+  const envVarName = `${serviceName.toUpperCase()}_CONNECTION_STRING`;
+  const connectionString = process.env[envVarName];
   
   if (!connectionString) {
-    // Fallback to environment variable
-    const envVarName = `${serviceName.toUpperCase()}_CONNECTION_STRING`;
-    const fallback = process.env[envVarName];
-    
-    if (!fallback) {
-      throw new Error(`Connection string for ${serviceName} not found in Key Vault or environment variables`);
-    }
-    
-    console.warn(`Using fallback environment variable for ${serviceName} connection string`);
-    return fallback;
+    throw new Error(`Connection string for ${serviceName} not found in environment variables (${envVarName})`);
   }
   
   return connectionString;
 };
 
 // Specific getters for common secrets
-export const getDatabaseConnectionString = async (): Promise<string> => {
+export const getDatabaseConnectionString = (): string => {
   return getConnectionString('postgres');
 };
 
-export const getCosmosConnectionString = async (): Promise<string> => {
+export const getCosmosConnectionString = (): string => {
   return getConnectionString('cosmos');
 };
 
-export const getServiceBusConnectionString = async (): Promise<string> => {
+export const getServiceBusConnectionString = (): string => {
   return getConnectionString('servicebus');
 };
 
-export const getEventHubConnectionString = async (): Promise<string> => {
+export const getEventHubConnectionString = (): string => {
   return getConnectionString('eventhub');
 };
 
-export const getWebPubSubConnectionString = async (): Promise<string> => {
+export const getWebPubSubConnectionString = (): string => {
   return getConnectionString('webpubsub');
 };
 
-export const getOpenAIApiKey = async (): Promise<string> => {
-  const apiKey = await getSecret('openai-api-key');
+export const getOpenAIApiKey = (): string => {
+  const apiKey = process.env.AZURE_OPENAI_KEY;
   
   if (!apiKey) {
-    const fallback = process.env.AZURE_OPENAI_KEY;
-    if (!fallback) {
-      throw new Error('OpenAI API key not found in Key Vault or environment variables');
-    }
-    return fallback;
+    throw new Error('OpenAI API key not found in environment variables (AZURE_OPENAI_KEY)');
   }
   
   return apiKey;
 };
 
 export const testKeyVaultConnection = async (): Promise<boolean> => {
-  try {
-    const client = getKeyVaultClient();
-    
-    // Try to list secrets (just to test connection)
-    const secretIterator = client.listPropertiesOfSecrets();
-    await secretIterator.next();
-    
-    console.log('Key Vault connection successful');
-    return true;
-  } catch (error) {
-    console.error('Key Vault connection failed:', error);
-    return false;
-  }
+  console.log('Key Vault removed - using environment variables for secrets');
+  return true;
 };

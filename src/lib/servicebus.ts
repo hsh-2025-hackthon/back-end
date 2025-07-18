@@ -21,9 +21,9 @@ interface EventMessage {
 
 let sbClient: ServiceBusClient;
 
-export const getServiceBusClient = async (): Promise<ServiceBusClient> => {
+export const getServiceBusClient = (): ServiceBusClient => {
   if (!sbClient) {
-    const connectionString = await getServiceBusConnectionString();
+    const connectionString = getServiceBusConnectionString();
     sbClient = new ServiceBusClient(connectionString);
   }
   return sbClient;
@@ -31,7 +31,7 @@ export const getServiceBusClient = async (): Promise<ServiceBusClient> => {
 
 // Command handling for CQRS pattern
 export const sendCommand = async (command: CommandMessage): Promise<void> => {
-  const client = await getServiceBusClient();
+  const client = getServiceBusClient();
   const sender = client.createSender('trip-commands');
 
   try {
@@ -54,7 +54,7 @@ export const sendCommand = async (command: CommandMessage): Promise<void> => {
 
 // Event publishing for event sourcing
 export const publishEvent = async (event: EventMessage): Promise<void> => {
-  const client = await getServiceBusClient();
+  const client = getServiceBusClient();
   const sender = client.createSender('trip-events');
 
   try {
@@ -120,7 +120,7 @@ export const publishTripEvent = async (
 
 // Command processor for handling incoming commands
 export const processCommands = async (processor: (command: CommandMessage) => Promise<void>): Promise<void> => {
-  const client = await getServiceBusClient();
+  const client = getServiceBusClient();
   const receiver = client.createReceiver('trip-commands');
 
   receiver.subscribe({
@@ -150,7 +150,7 @@ export const processCommands = async (processor: (command: CommandMessage) => Pr
 
 // Event processor for handling published events
 export const processEvents = async (processor: (event: EventMessage) => Promise<void>): Promise<void> => {
-  const client = await getServiceBusClient();
+  const client = getServiceBusClient();
   const receiver = client.createReceiver('trip-events');
 
   receiver.subscribe({

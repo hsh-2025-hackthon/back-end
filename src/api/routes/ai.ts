@@ -45,7 +45,7 @@ router.post('/itinerary', requireAuth, async (req: Request, res: Response) => {
       });
     }
 
-    const client = getOpenAIClient();
+    const client = await getOpenAIClient();
     
     const prompt = `Generate a detailed ${duration}-day itinerary for ${destination}.
     
@@ -140,7 +140,7 @@ router.post('/recommendations', requireAuth, async (req: Request, res: Response)
       });
     }
 
-    const client = getOpenAIClient();
+    const client = await getOpenAIClient();
     
     const prompt = `Recommend the best ${category} in ${destination}.
     
@@ -221,7 +221,7 @@ router.post('/enhance-trip/:tripId', requireAuth, async (req: Request, res: Resp
       return res.status(403).json({ message: 'Access denied to this trip' });
     }
 
-    const client = getOpenAIClient();
+    const client = await getOpenAIClient();
     
     const prompt = `Enhance this existing trip with additional suggestions:
     
