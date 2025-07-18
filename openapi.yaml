@@ -1,9 +1,9 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: Collaborative Travel Planner API
   description: |-
     This is the API for the Collaborative Travel Planner application. It allows users to create, manage, and share travel itineraries. The API supports real-time collaboration features through WebSockets.
-    Authentication is handled via JWT Bearer tokens obtained from Azure AD B2C.
+    Authentication is handled via JWT Bearer tokens obtained from Google OAuth.
   version: 1.0.0
 servers:
   - url: /api
