@@ -1,10 +1,17 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { generateItinerary } from '../../lib/openai';
 import { validateJwt } from '../middleware/auth';
 
 const router = Router();
 
-router.post('/itinerary', validateJwt, async (req, res) => {
+interface ItineraryRequest extends Request {
+  body: {
+    destination: string;
+    duration: number;
+  };
+}
+
+router.post('/itinerary', validateJwt, async (req: ItineraryRequest, res: Response) => {
   const { destination, duration } = req.body;
 
   if (!destination || !duration) {

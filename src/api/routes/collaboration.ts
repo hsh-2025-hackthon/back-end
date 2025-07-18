@@ -1,13 +1,22 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { getWebPubSubAccessToken } from '../../lib/webpubsub';
-import { validateJwt }f rom '../middleware/auth';
+import { validateJwt } from '../middleware/auth';
 
 const router = Router();
 
-router.post('/token', validateJwt, async (req, res) => {
+interface CollaborationRequest extends Request {
+  body: {
+    tripId: string;
+  };
+  user?: {
+    id: string;
+  };
+}
+
+router.post('/token', validateJwt, async (req: CollaborationRequest, res: Response) => {
   const { tripId } = req.body;
   // In a real app, you'd get the user ID from the decoded JWT
-  const userId = (req as any).user?.id || 'mock-user';
+  const userId = req.user?.id || 'mock-user';
 
   if (!tripId) {
     return res.status(400).json({ message: 'tripId is required' });
