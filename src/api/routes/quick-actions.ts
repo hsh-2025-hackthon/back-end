@@ -117,9 +117,6 @@ async function executeQuickAction(parsed: any, req: Request, res: Response): Pro
     case CommandIntent.CREATE_VOTE:
       return await executeCreateVote(parsed.parameters, tripId, userId);
       
-    case CommandIntent.EXPORT_ITINERARY:
-      return await executeExportItinerary(trip);
-      
     default:
       throw new Error(`Action not implemented: ${parsed.intent}`);
   }
@@ -256,27 +253,6 @@ async function executeCreateVote(params: any, tripId: string, userId: string): P
   return {
     type: 'vote_created',
     vote
-  };
-}
-
-async function executeExportItinerary(trip: any): Promise<any> {
-  const itineraryData = {
-    trip: {
-      id: trip.id,
-      title: trip.title,
-      description: trip.description,
-      startDate: trip.startDate,
-      endDate: trip.endDate,
-      destinations: trip.destinations
-    },
-    exportFormat: 'pdf',
-    exportedAt: new Date().toISOString()
-  };
-
-  return {
-    type: 'itinerary_export',
-    itinerary: itineraryData,
-    note: 'PDF generation will be implemented in the next phase'
   };
 }
 
@@ -489,43 +465,6 @@ router.post('/:tripId/quick-actions/create-vote', requireAuth, verifyTripAccess,
   } catch (error) {
     console.error('Error creating vote:', error);
     res.status(500).json({ error: 'Failed to create vote' });
-  }
-});
-
-/**
- * POST /api/trips/{tripId}/quick-actions/export-itinerary
- * Trigger the export of the trip itinerary
- */
-router.post('/:tripId/quick-actions/export-itinerary', requireAuth, verifyTripAccess, async (req: Request, res: Response) => {
-  try {
-    const trip = (req as any).trip;
-    const { format = 'pdf' } = req.body;
-
-    // For now, return a structured itinerary data
-    // TODO: Implement actual PDF generation in a future session
-    const itineraryData = {
-      trip: {
-        id: trip.id,
-        title: trip.title,
-        description: trip.description,
-        startDate: trip.startDate,
-        endDate: trip.endDate,
-        destinations: trip.destinations
-      },
-      exportFormat: format,
-      exportedAt: new Date().toISOString(),
-      downloadUrl: `/api/trips/${trip.id}/export/${format}` // Future implementation
-    };
-
-    res.json({
-      success: true,
-      message: 'Itinerary export prepared',
-      itinerary: itineraryData,
-      note: 'PDF generation will be implemented in the next phase'
-    });
-  } catch (error) {
-    console.error('Error exporting itinerary:', error);
-    res.status(500).json({ error: 'Failed to export itinerary' });
   }
 });
 

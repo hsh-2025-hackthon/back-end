@@ -448,4 +448,104 @@ router.get('/trips/:tripId/expenses/summary', requireAuth, async (req: Request, 
   }
 });
 
+/**
+ * GET /api/trips/:tripId/expenses/export/csv
+ * Export trip expenses as CSV
+ */
+router.get('/trips/:tripId/expenses/export/csv', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { tripId } = req.params;
+    
+    // Check access
+    const hasAccess = await checkTripAccess(tripId, req.user!.id);
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    
+    // Fetch all expenses for the trip
+    const result = await ExpenseRepository.findExpensesByTripId(tripId);
+    const expenses = result.expenses;
+    
+    // Generate CSV content
+    const csvHeader = [
+      'Date',
+      'Title',
+      'Description',
+      'Amount',
+      'Currency',
+      'Base Amount',
+      'Base Currency',
+      'Category',
+      'Subcategory',
+      'Payer',
+      'Created By',
+      'Split Method',
+      'Participants',
+      'Status',
+      'Verification Status',
+      'Location',
+      'Tags'
+    ].join(',');
+    
+    const csvRows = expenses.map(expense => {
+      // Helper function to escape CSV values
+      const escapeCSV = (value: any): string => {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+      
+      const participantNames = expense.participants?.length > 0 
+        ? `"${expense.participants.length} participants"` 
+        : '';
+      
+      const locationStr = expense.location 
+        ? `"${expense.location.address}"` 
+        : '';
+      
+      const tagsStr = expense.tags?.length > 0 
+        ? `"${expense.tags.join('; ')}"` 
+        : '';
+      
+      return [
+        escapeCSV(expense.expenseDate ? new Date(expense.expenseDate).toISOString().split('T')[0] : ''),
+        escapeCSV(expense.title),
+        escapeCSV(expense.description || ''),
+        escapeCSV(expense.amount),
+        escapeCSV(expense.currency),
+        escapeCSV(expense.baseAmount),
+        escapeCSV(expense.baseCurrency),
+        escapeCSV(expense.category),
+        escapeCSV(expense.subcategory || ''),
+        escapeCSV((expense as any).payerName || 'Unknown'),
+        escapeCSV((expense as any).userName || 'Unknown'),
+        escapeCSV(expense.splitMethod),
+        participantNames,
+        escapeCSV(expense.status),
+        escapeCSV(expense.verificationStatus),
+        locationStr,
+        tagsStr
+      ].join(',');
+    });
+    
+    const csvContent = [csvHeader, ...csvRows].join('\n');
+    
+    // Set headers for CSV download
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `trip-${tripId}-expenses-${timestamp}.csv`;
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'no-cache');
+    
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Error exporting expenses to CSV:', error);
+    res.status(500).json({ message: 'Failed to export expenses' });
+  }
+});
+
 export default router;

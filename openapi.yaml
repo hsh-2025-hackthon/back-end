@@ -1902,22 +1902,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WeatherData'
-  /trips/{tripId}/quick-actions/export-itinerary:
-    post:
-      summary: Trigger the export of the trip itinerary
-      description: Triggers the export of the trip itinerary (e.g., to PDF).
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: tripId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '202':
-          description: Itinerary export accepted.
   /trips/{tripId}/quick-actions/create-vote:
     post:
       summary: Quickly create a new vote in the trip's chat
@@ -1951,10 +1935,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Vote'
-  /trips/{tripId}/export/pdf:
-    get:
-      summary: Generate and provide a PDF export of the trip itinerary
-      description: Generates and provides a PDF export of the trip itinerary.
+  /trips/{tripId}/agents/optimize-itinerary:
+    post:
+      summary: Trigger AI agents to optimize trip itinerary
+      description: Orchestrates multiple AI agents to analyze requirements and optimize the trip itinerary based on chat messages and preferences.
       security:
         - bearerAuth: []
       parameters:
@@ -1964,35 +1948,275 @@ paths:
           schema:
             type: string
             format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    description: Chat messages to analyze
+                options:
+                  type: object
+                  properties:
+                    prioritizeTime:
+                      type: boolean
+                    prioritizeCost:
+                      type: boolean
+                    prioritizeExperience:
+                      type: boolean
+                    generateAlternatives:
+                      type: boolean
+              required:
+                - messages
       responses:
         '200':
-          description: PDF file.
+          description: Itinerary optimization completed successfully.
           content:
-            application/pdf:
+            application/json:
               schema:
-                type: string
-                format: binary
+                $ref: '#/components/schemas/AgentOptimizationResponse'
+        '400':
+          description: Invalid request data
+        '404':
+          description: Trip not found
+        '500':
+          description: Optimization failed
+  /trips/{tripId}/agents/analyze-requirements:
+    post:
+      summary: Analyze travel requirements from chat messages
+      description: Uses AI agents to extract and analyze travel requirements from conversation messages.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    description: Chat messages to analyze
+              required:
+                - messages
+      responses:
+        '200':
+          description: Requirements analysis completed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRequirementResponse'
+  /trips/{tripId}/agents/adjust-plan:
+    post:
+      summary: Handle adaptive adjustments for trip disruptions
+      description: Creates adjustment plans when disruptions occur during travel.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                disruption:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      enum: [weather, transportation, accommodation, activity_closure, emergency]
+                    severity:
+                      type: string
+                      enum: [low, medium, high, critical]
+                    affectedDestination:
+                      type: string
+                    affectedDate:
+                      type: string
+                      format: date
+                    description:
+                      type: string
+                    suggestedActions:
+                      type: array
+                      items:
+                        type: string
+                  required:
+                    - type
+                    - severity
+                    - description
+              required:
+                - disruption
+      responses:
+        '200':
+          description: Adjustment plan created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentAdjustmentResponse'
+  /trips/{tripId}/agents/status/{sessionId}:
+    get:
+      summary: Get agent session status
+      description: Retrieves the current status of an AI agent workflow session.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session status retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSessionStatus'
+        '404':
+          description: Session not found
+  /trips/{tripId}/agents/sessions/{sessionId}:
+    delete:
+      summary: Cancel an active agent session
+      description: Cancels an active AI agent workflow session.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session cancelled successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  sessionId:
+                    type: string
+        '400':
+          description: Session could not be cancelled
+        '404':
+          description: Session not found
+  /agents/available:
+    get:
+      summary: Get available AI agents and their capabilities
+      description: Returns a list of all available AI agents and their capabilities.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Available agents retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AgentInfo'
+                  totalAgents:
+                    type: integer
+                  generatedAt:
+                    type: string
+                    format: date-time
   /trips/{tripId}/expenses/export/csv:
     get:
       summary: Generate and provide a CSV export of the trip's expense report
-      description: Generates and provides a CSV export of the trip's expense report.
+      description: |
+        Generates and provides a CSV export of all expenses for a specific trip. 
+        The CSV includes comprehensive expense data such as dates, amounts, categories, 
+        payers, participants, and other relevant expense information.
+        
+        The response includes appropriate headers for file download with a timestamped filename.
+      tags:
+        - Expenses
       security:
         - bearerAuth: []
       parameters:
         - name: tripId
           in: path
           required: true
+          description: The unique identifier of the trip
           schema:
             type: string
             format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
       responses:
         '200':
-          description: CSV file.
+          description: CSV file containing trip expense data
+          headers:
+            Content-Disposition:
+              description: Attachment header with filename
+              schema:
+                type: string
+                example: 'attachment; filename="trip-123e4567-expenses-2025-07-19.csv"'
+            Content-Type:
+              description: MIME type for CSV content
+              schema:
+                type: string
+                example: 'text/csv'
           content:
             text/csv:
               schema:
                 type: string
                 format: binary
+                description: |
+                  CSV file containing expense data with columns:
+                  Date, Title, Description, Amount, Currency, Base Amount, Base Currency,
+                  Category, Subcategory, Payer, Created By, Split Method, Participants,
+                  Status, Verification Status, Location, Tags
+        '403':
+          description: Access denied - User does not have access to this trip
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /health:
     get:
       summary: Get overall system health
@@ -3462,6 +3686,288 @@ components:
           example: "The requested service could not be found"
       required:
         - error
+    # AI Agent Schemas
+    AgentOptimizationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        sessionId:
+          type: string
+        requirements:
+          $ref: '#/components/schemas/TravelRequirements'
+        itinerary:
+          $ref: '#/components/schemas/OptimizedItinerary'
+        alternatives:
+          type: array
+          items:
+            $ref: '#/components/schemas/OptimizedItinerary'
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        processingTime:
+          type: number
+          description: Processing time in milliseconds
+        recommendations:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+        generatedAt:
+          type: string
+          format: date-time
+    AgentRequirementResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        sessionId:
+          type: string
+        requirements:
+          $ref: '#/components/schemas/TravelRequirements'
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        processingTime:
+          type: number
+          description: Processing time in milliseconds
+        recommendations:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+        generatedAt:
+          type: string
+          format: date-time
+    AgentAdjustmentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        sessionId:
+          type: string
+        disruption:
+          $ref: '#/components/schemas/DisruptionEvent'
+        originalItinerary:
+          $ref: '#/components/schemas/OptimizedItinerary'
+        adjustedItinerary:
+          $ref: '#/components/schemas/OptimizedItinerary'
+        impactAnalysis:
+          type: object
+          properties:
+            affectedDays:
+              type: integer
+            costImpact:
+              type: number
+            experienceImpact:
+              type: number
+        alternatives:
+          type: array
+          items:
+            $ref: '#/components/schemas/OptimizedItinerary'
+        recommendations:
+          type: array
+          items:
+            type: string
+        generatedAt:
+          type: string
+          format: date-time
+    AgentSessionStatus:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        tripId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, completed, failed, cancelled]
+        currentStep:
+          type: string
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        errors:
+          type: array
+          items:
+            type: string
+        hasResults:
+          type: boolean
+    AgentInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            version:
+              type: string
+            capabilities:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  description:
+                    type: string
+                  inputSchema:
+                    type: object
+                  outputSchema:
+                    type: object
+    TravelRequirements:
+      type: object
+      properties:
+        destinations:
+          type: array
+          items:
+            type: string
+        budget:
+          type: object
+          properties:
+            total:
+              type: number
+            currency:
+              type: string
+            categories:
+              type: object
+        dates:
+          type: object
+          properties:
+            startDate:
+              type: string
+              format: date
+            endDate:
+              type: string
+              format: date
+            duration:
+              type: integer
+            flexibility:
+              type: string
+              enum: [rigid, flexible, very_flexible]
+        preferences:
+          type: object
+        groupDynamics:
+          type: object
+          properties:
+            size:
+              type: integer
+            interests:
+              type: array
+              items:
+                type: string
+        priorities:
+          type: object
+          properties:
+            primary:
+              type: array
+              items:
+                type: string
+            secondary:
+              type: array
+              items:
+                type: string
+        sentiment:
+          type: object
+          properties:
+            overall:
+              type: string
+              enum: [positive, neutral, negative]
+            excitement:
+              type: number
+              format: float
+            consensus:
+              type: number
+              format: float
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+    OptimizedItinerary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        totalCost:
+          type: number
+        currency:
+          type: string
+        duration:
+          type: integer
+        destinations:
+          type: array
+          items:
+            type: object
+        dailyPlans:
+          type: array
+          items:
+            type: object
+        transportation:
+          type: array
+          items:
+            type: object
+        budgetBreakdown:
+          type: object
+          properties:
+            accommodation:
+              type: number
+            transportation:
+              type: number
+            activities:
+              type: number
+            food:
+              type: number
+            miscellaneous:
+              type: number
+        optimizationScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+    DisruptionEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [weather, transportation, accommodation, activity_closure, emergency]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        affectedDestination:
+          type: string
+        affectedDate:
+          type: string
+          format: date
+        description:
+          type: string
+        suggestedActions:
+          type: array
+          items:
+            type: string
   securitySchemes:
     bearerAuth:
       type: http

@@ -395,7 +395,7 @@ export class NotificationService {
     return `+1234567890`;
   }
 
-  async shutdown(): void {
+  async shutdown(): Promise<void> {
     // Clear all scheduled notifications
     for (const timeoutId of this.scheduledNotifications.values()) {
       clearTimeout(timeoutId);

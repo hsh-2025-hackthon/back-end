@@ -23,6 +23,7 @@ import healthRouter from './api/routes/health';
 import quickActionsRouter from './api/routes/quick-actions';
 import bookingRouter from './api/routes/booking';
 import smartCardsRouter from './api/routes/smart-cards';
+import agentsRouter from './api/routes/agents';
 
 // Middleware
 app.use(express.json());
@@ -116,6 +117,7 @@ app.use('/api', notificationsRouter);
 app.use('/api/trips', quickActionsRouter);
 app.use('/api/trips', smartCardsRouter);
 app.use('/api/booking', bookingRouter);
+app.use('/api', agentsRouter);
 app.use('/health', healthRouter);
 
 
