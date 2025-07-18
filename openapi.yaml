@@ -2159,6 +2159,130 @@ paths:
                   generatedAt:
                     type: string
                     format: date-time
+  /agents/sessions:
+    get:
+      summary: List all active agent sessions
+      description: Returns a list of all active AI agent workflow sessions across all trips for the authenticated user.
+      tags:
+        - AI Agents
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Active sessions retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AgentSessionStatus'
+        '500':
+          description: Failed to retrieve sessions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /agents/sessions/{sessionId}:
+    get:
+      summary: Get detailed session information
+      description: Retrieves detailed information about a specific AI agent session.
+      tags:
+        - AI Agents
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session details retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSessionStatus'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Cancel an agent session
+      description: Cancels an active AI agent workflow session.
+      tags:
+        - AI Agents
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session cancelled successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Session cancelled successfully"
+                  sessionId:
+                    type: string
+        '400':
+          description: Session could not be cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /agents/sessions/{sessionId}/results:
+    get:
+      summary: Get session results
+      description: Retrieves the results from a completed AI agent session.
+      tags:
+        - AI Agents
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session results retrieved successfully.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AgentOptimizationResponse'
+                  - $ref: '#/components/schemas/AgentRequirementResponse'
+                  - $ref: '#/components/schemas/AgentAdjustmentResponse'
+        '404':
+          description: Session not found or no results available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Session still in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/expenses/export/csv:
     get:
       summary: Generate and provide a CSV export of the trip's expense report
@@ -2207,6 +2331,450 @@ paths:
                   Status, Verification Status, Location, Tags
         '403':
           description: Access denied - User does not have access to this trip
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/versions:
+    get:
+      summary: Get trip version history
+      description: Retrieves the complete version history for a trip, including all changes and revisions.
+      tags:
+        - Version Control
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Version history retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TripVersion'
+                  totalVersions:
+                    type: integer
+                  hasMore:
+                    type: boolean
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/versions/{versionId}/restore:
+    post:
+      summary: Restore trip to a previous version
+      description: Restores the trip to a specific previous version, creating a new version in the process.
+      tags:
+        - Version Control
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Trip restored successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  newVersionId:
+                    type: string
+                    format: uuid
+                  restoredTo:
+                    type: string
+                    format: uuid
+                  message:
+                    type: string
+        '403':
+          description: Access denied or insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or version not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict - unable to restore due to recent changes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/changes:
+    get:
+      summary: Get recent changes for a trip
+      description: Retrieves recent changes and modifications made to the trip.
+      tags:
+        - Version Control
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: since
+          in: query
+          description: Only return changes since this timestamp
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Recent changes retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  changes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TripChange'
+                  hasMore:
+                    type: boolean
+                  lastTimestamp:
+                    type: string
+                    format: date-time
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/permissions:
+    get:
+      summary: Get trip permission matrix
+      description: Retrieves the detailed permission matrix for all members of the trip.
+      tags:
+        - Collaboration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Permission matrix retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permissions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserPermissions'
+                  defaultPermissions:
+                    $ref: '#/components/schemas/PermissionSet'
+        '403':
+          description: Access denied - Admin permissions required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/members/{userId}/permissions:
+    put:
+      summary: Update detailed permissions for a trip member
+      description: Updates the detailed permission settings for a specific trip member.
+      tags:
+        - Collaboration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionSet'
+      responses:
+        '200':
+          description: Permissions updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  updatedPermissions:
+                    $ref: '#/components/schemas/UserPermissions'
+        '403':
+          description: Access denied - Admin permissions required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or user not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/conflicts:
+    get:
+      summary: Get current conflicts in trip data
+      description: Retrieves any current data conflicts that need resolution in the CRDT system.
+      tags:
+        - Collaboration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Conflicts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conflicts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DataConflict'
+                  conflictCount:
+                    type: integer
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/conflicts/{conflictId}/resolve:
+    post:
+      summary: Resolve a data conflict
+      description: Resolves a specific data conflict by choosing a resolution strategy.
+      tags:
+        - Collaboration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: conflictId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resolution:
+                  type: string
+                  enum: [accept_local, accept_remote, merge_custom]
+                customData:
+                  type: object
+                  description: Required when resolution is 'merge_custom'
+      responses:
+        '200':
+          description: Conflict resolved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  resolvedConflict:
+                    $ref: '#/components/schemas/DataConflict'
+        '400':
+          description: Invalid resolution strategy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or conflict not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/timeline:
+    get:
+      summary: Get timeline data for Gantt chart visualization
+      description: Retrieves structured timeline data suitable for Gantt chart rendering and project visualization.
+      tags:
+        - Visualization
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: granularity
+          in: query
+          description: Time granularity for the timeline
+          schema:
+            type: string
+            enum: [hour, day, week]
+            default: day
+      responses:
+        '200':
+          description: Timeline data retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimelineData'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/map-data:
+    get:
+      summary: Get map visualization data
+      description: Retrieves structured data for map visualization including markers, routes, and geographic information.
+      tags:
+        - Visualization
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: includeRoutes
+          in: query
+          description: Whether to include route calculations
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Map data retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapVisualizationData'
+        '403':
+          description: Access denied
           content:
             application/json:
               schema:
@@ -3968,6 +4536,442 @@ components:
           type: array
           items:
             type: string
+    # Version Control Schemas
+    TripVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        versionNumber:
+          type: integer
+        createdBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TripChange'
+        summary:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        dataSnapshot:
+          type: object
+          description: Complete trip data at this version
+    TripChange:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        userName:
+          type: string
+        changeType:
+          type: string
+          enum: [create, update, delete, restore]
+        entityType:
+          type: string
+          enum: [trip, destination, itinerary, expense, vote, chat_message, member]
+        entityId:
+          type: string
+        fieldName:
+          type: string
+        oldValue:
+          type: object
+        newValue:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+        description:
+          type: string
+        impact:
+          type: string
+          enum: [low, medium, high]
+    # Collaboration Schemas
+    UserPermissions:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        userName:
+          type: string
+        role:
+          type: string
+          enum: [owner, admin, editor, viewer]
+        permissions:
+          $ref: '#/components/schemas/PermissionSet'
+        grantedBy:
+          type: string
+          format: uuid
+        grantedAt:
+          type: string
+          format: date-time
+        lastActive:
+          type: string
+          format: date-time
+    PermissionSet:
+      type: object
+      properties:
+        canEditTrip:
+          type: boolean
+          default: false
+        canEditItinerary:
+          type: boolean
+          default: false
+        canManageExpenses:
+          type: boolean
+          default: false
+        canCreateVotes:
+          type: boolean
+          default: false
+        canManageMembers:
+          type: boolean
+          default: false
+        canDeleteContent:
+          type: boolean
+          default: false
+        canExportData:
+          type: boolean
+          default: false
+        canManageBookings:
+          type: boolean
+          default: false
+        canAccessAnalytics:
+          type: boolean
+          default: false
+        canModeratChat:
+          type: boolean
+          default: false
+        granularPermissions:
+          type: object
+          properties:
+            destinations:
+              type: object
+              properties:
+                create:
+                  type: boolean
+                edit:
+                  type: boolean
+                delete:
+                  type: boolean
+            activities:
+              type: object
+              properties:
+                create:
+                  type: boolean
+                edit:
+                  type: boolean
+                delete:
+                  type: boolean
+            expenses:
+              type: object
+              properties:
+                viewAll:
+                  type: boolean
+                editOwn:
+                  type: boolean
+                editAll:
+                  type: boolean
+                approveSettlements:
+                  type: boolean
+    DataConflict:
+      type: object
+      properties:
+        id:
+          type: string
+        entityType:
+          type: string
+          enum: [trip, destination, itinerary, expense, vote]
+        entityId:
+          type: string
+        fieldName:
+          type: string
+        conflictType:
+          type: string
+          enum: [concurrent_edit, delete_conflict, dependency_conflict]
+        localValue:
+          type: object
+        remoteValue:
+          type: object
+        lastModifiedBy:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+                format: uuid
+              timestamp:
+                type: string
+                format: date-time
+        suggestedResolution:
+          type: string
+          enum: [accept_local, accept_remote, merge_custom]
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+        createdAt:
+          type: string
+          format: date-time
+    # Visualization Schemas
+    TimelineData:
+      type: object
+      properties:
+        tripId:
+          type: string
+          format: uuid
+        timeframe:
+          type: object
+          properties:
+            start:
+              type: string
+              format: date-time
+            end:
+              type: string
+              format: date-time
+            duration:
+              type: integer
+              description: Duration in days
+        tasks:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              type:
+                type: string
+                enum: [travel, accommodation, activity, meal, free_time]
+              start:
+                type: string
+                format: date-time
+              end:
+                type: string
+                format: date-time
+              duration:
+                type: integer
+                description: Duration in minutes
+              dependencies:
+                type: array
+                items:
+                  type: string
+                  description: IDs of dependent tasks
+              status:
+                type: string
+                enum: [planned, confirmed, in_progress, completed, cancelled]
+              progress:
+                type: integer
+                minimum: 0
+                maximum: 100
+              location:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  coordinates:
+                    type: array
+                    items:
+                      type: number
+              cost:
+                type: number
+              currency:
+                type: string
+              assignedTo:
+                type: array
+                items:
+                  type: string
+                  format: uuid
+              priority:
+                type: string
+                enum: [low, medium, high]
+              tags:
+                type: array
+                items:
+                  type: string
+        milestones:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              date:
+                type: string
+                format: date-time
+              type:
+                type: string
+                enum: [departure, arrival, checkpoint, deadline]
+              status:
+                type: string
+                enum: [upcoming, reached, missed]
+        criticalPath:
+          type: array
+          items:
+            type: string
+            description: Task IDs that form the critical path
+        generatedAt:
+          type: string
+          format: date-time
+    MapVisualizationData:
+      type: object
+      properties:
+        tripId:
+          type: string
+          format: uuid
+        bounds:
+          type: object
+          properties:
+            northeast:
+              type: object
+              properties:
+                lat:
+                  type: number
+                lng:
+                  type: number
+            southwest:
+              type: object
+              properties:
+                lat:
+                  type: number
+                lng:
+                  type: number
+        markers:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              type:
+                type: string
+                enum: [destination, accommodation, activity, restaurant, transport_hub, custom]
+              coordinates:
+                type: object
+                properties:
+                  lat:
+                    type: number
+                  lng:
+                    type: number
+              title:
+                type: string
+              description:
+                type: string
+              date:
+                type: string
+                format: date-time
+              status:
+                type: string
+                enum: [planned, confirmed, visited, cancelled]
+              metadata:
+                type: object
+                properties:
+                  address:
+                    type: string
+                  rating:
+                    type: number
+                  priceLevel:
+                    type: integer
+                  category:
+                    type: string
+                  photos:
+                    type: array
+                    items:
+                      type: string
+              clustering:
+                type: object
+                properties:
+                  groupId:
+                    type: string
+                  groupName:
+                    type: string
+        routes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              waypoints:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    lat:
+                      type: number
+                    lng:
+                      type: number
+                    name:
+                      type: string
+                    order:
+                      type: integer
+              travelMode:
+                type: string
+                enum: [driving, walking, transit, cycling]
+              distance:
+                type: number
+                description: Distance in meters
+              duration:
+                type: number
+                description: Duration in seconds
+              polyline:
+                type: string
+                description: Encoded polyline for route visualization
+              date:
+                type: string
+                format: date
+              status:
+                type: string
+                enum: [planned, active, completed]
+        heatmapData:
+          type: array
+          items:
+            type: object
+            properties:
+              lat:
+                type: number
+              lng:
+                type: number
+              weight:
+                type: number
+                description: Activity intensity at this location
+        layers:
+          type: object
+          properties:
+            showTransport:
+              type: boolean
+            showAccommodation:
+              type: boolean
+            showActivities:
+              type: boolean
+            showRestaurants:
+              type: boolean
+            showRoutes:
+              type: boolean
+            showHeatmap:
+              type: boolean
+        generatedAt:
+          type: string
+          format: date-time
   securitySchemes:
     bearerAuth:
       type: http
