@@ -318,8 +318,15 @@ router.put('/chat/messages/:messageId', requireAuth, async (req: Request, res: R
     const { content } = SendMessageSchema.pick({ content: true }).parse(req.body);
     
     // Get message and check ownership
-    const messages = await ChatRepository.getMessages('', { limit: 1 });
-    // Note: This is a simplified check - in production, you'd need a proper getMessageById method
+    const message = await ChatRepository.getMessageById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+
+    // Check if user is the message sender
+    if (message.userId !== req.user!.id) {
+      return res.status(403).json({ message: 'You can only edit your own messages' });
+    }
     
     const updatedMessage = await ChatRepository.updateMessage(messageId, { content });
     
