@@ -9,7 +9,7 @@ const router = Router();
 /**
  * Trigger AI agents to optimize itinerary for a trip
  */
-router.post('/trips/:tripId/agents/optimize-itinerary', requireAuth, async (req: Request, res: Response) => {
+router.post('/trips/:tripId/optimize-itinerary', requireAuth, async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
     const userId = req.user!.id;
@@ -64,7 +64,7 @@ router.post('/trips/:tripId/agents/optimize-itinerary', requireAuth, async (req:
 /**
  * Analyze requirements from chat messages
  */
-router.post('/trips/:tripId/agents/analyze-requirements', requireAuth, async (req: Request, res: Response) => {
+router.post('/trips/:tripId/analyze-requirements', requireAuth, async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
     const userId = req.user!.id;
@@ -114,7 +114,7 @@ router.post('/trips/:tripId/agents/analyze-requirements', requireAuth, async (re
 /**
  * Handle adaptive adjustments for disruptions
  */
-router.post('/trips/:tripId/agents/adjust-plan', requireAuth, async (req: Request, res: Response) => {
+router.post('/trips/:tripId/adjust-plan', requireAuth, async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
     const userId = req.user!.id;
@@ -171,7 +171,7 @@ router.post('/trips/:tripId/agents/adjust-plan', requireAuth, async (req: Reques
 /**
  * Get agent session status
  */
-router.get('/trips/:tripId/agents/status/:sessionId', requireAuth, async (req: Request, res: Response) => {
+router.get('/trips/:tripId/status/:sessionId', requireAuth, async (req: Request, res: Response) => {
   try {
     const { tripId, sessionId } = req.params;
     const userId = req.user!.id;
@@ -217,7 +217,7 @@ router.get('/trips/:tripId/agents/status/:sessionId', requireAuth, async (req: R
 /**
  * Cancel an active agent session
  */
-router.delete('/trips/:tripId/agents/sessions/:sessionId', requireAuth, async (req: Request, res: Response) => {
+router.delete('/trips/:tripId/sessions/:sessionId', requireAuth, async (req: Request, res: Response) => {
   try {
     const { tripId, sessionId } = req.params;
     const userId = req.user!.id;
@@ -266,7 +266,7 @@ router.delete('/trips/:tripId/agents/sessions/:sessionId', requireAuth, async (r
 /**
  * Get available AI agents and their capabilities
  */
-router.get('/agents/available', requireAuth, async (req: Request, res: Response) => {
+router.get('/available', requireAuth, async (req: Request, res: Response) => {
   try {
     const agents = agentCoordinator.getAvailableAgents();
     
@@ -288,7 +288,7 @@ router.get('/agents/available', requireAuth, async (req: Request, res: Response)
 /**
  * Get all AI agent sessions for the user
  */
-router.get('/agents/sessions', requireAuth, async (req: Request, res: Response) => {
+router.get('/sessions', requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     
@@ -324,7 +324,7 @@ router.get('/agents/sessions', requireAuth, async (req: Request, res: Response) 
 /**
  * Get detailed session information
  */
-router.get('/agents/sessions/:sessionId', requireAuth, async (req: Request, res: Response) => {
+router.get('/sessions/:sessionId', requireAuth, async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
     const userId = req.user!.id;
@@ -369,7 +369,7 @@ router.get('/agents/sessions/:sessionId', requireAuth, async (req: Request, res:
 /**
  * Cancel an active AI agent session
  */
-router.post('/agents/sessions/:sessionId/cancel', requireAuth, async (req: Request, res: Response) => {
+router.post('/sessions/:sessionId/cancel', requireAuth, async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
     const userId = req.user!.id;
@@ -412,7 +412,7 @@ router.post('/agents/sessions/:sessionId/cancel', requireAuth, async (req: Reque
 /**
  * Get logs for an AI agent session
  */
-router.get('/agents/sessions/:sessionId/logs', requireAuth, async (req: Request, res: Response) => {
+router.get('/sessions/:sessionId/logs', requireAuth, async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
     const userId = req.user!.id;
@@ -483,7 +483,7 @@ router.get('/agents/sessions/:sessionId/logs', requireAuth, async (req: Request,
 /**
  * Get session results
  */
-router.get('/agents/sessions/:sessionId/results', requireAuth, async (req: Request, res: Response) => {
+router.get('/sessions/:sessionId/results', requireAuth, async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
     const userId = req.user!.id;

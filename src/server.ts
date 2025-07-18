@@ -128,7 +128,8 @@ app.use('/api', notificationsRouter);
 app.use('/api/trips', quickActionsRouter);
 app.use('/api/trips', smartCardsRouter);
 app.use('/api/booking', bookingRouter);
-app.use('/api', agentsRouter);
+app.use('/api/agents', agentsRouter);
+
 app.use('/api', versionsRouter);  // Version control endpoints
 app.use('/api', permissionsRouter);  // Permission management endpoints
 app.use('/api', visualizationRouter);  // Visualization data endpoints
