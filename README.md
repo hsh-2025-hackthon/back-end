@@ -1,4 +1,280 @@
-# Collaborative Travel Planning AI System
+# Travel Planning Backend
+
+A comprehensive backend implementation for the Collaborative Travel Planning AI System, built with Node.js, TypeScript, and Azure services.
+
+## 🏗️ Architecture
+
+This backend follows a **modular monolith** approach with microservices for specific features:
+
+- **Core API**: Express.js server with TypeScript
+- **Database Layer**: PostgreSQL for transactional data, Cosmos DB for read-optimized data
+- **Authentication**: Azure AD B2C with JWT validation
+- **Real-time Communication**: Azure Web PubSub for collaboration
+- **Event-Driven**: Azure Service Bus for commands, Event Hubs for analytics
+- **AI Integration**: Azure OpenAI for recommendations and itinerary generation
+- **Search**: Azure Cognitive Search for vector-based destination search
+- **Security**: Azure Key Vault for secrets management
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18+ and npm/pnpm
+- PostgreSQL database
+- Azure account with required services
+
+### Installation
+
+1. **Clone and install dependencies:**
+   ```bash
+   cd back-end
+   npm install
+   ```
+
+2. **Environment setup:**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Azure service connection strings
+   ```
+
+3. **Database setup:**
+   ```bash
+   # Test all connections
+   npm run test:connection
+   
+   # Run database migrations
+   npm run migrate
+   ```
+
+4. **Start development server:**
+   ```bash
+   npm run dev
+   ```
+
+The server will start on `http://localhost:3000` with automatic database initialization.
+
+## 🛠️ Available Scripts
+
+- `npm run dev` - Start development server with hot reload
+- `npm run build` - Build TypeScript to JavaScript
+- `npm run start` - Start production server
+- `npm run migrate` - Run database migrations
+- `npm run test:connection` - Test all Azure service connections
+
+## 📚 API Documentation
+
+### Base URL
+- Development: `http://localhost:3000/api`
+- Health Check: `http://localhost:3000/health`
+
+### Authentication
+All protected endpoints require a Bearer token from Azure AD B2C:
+```
+Authorization: Bearer <jwt_token>
+```
+
+### Core Endpoints
+
+#### Users (`/api/users`)
+- `GET /me` - Get current user profile
+- `PUT /me` - Update current user profile
+- `GET /:id` - Get user by ID (public profile)
+- `GET /` - Search users (for collaboration)
+- `DELETE /me` - Delete current user account
+
+#### Trips (`/api/trips`)
+- `GET /` - Get user's trips
+- `GET /:id` - Get trip details
+- `POST /` - Create new trip
+- `PUT /:id` - Update trip
+- `DELETE /:id` - Delete trip
+- `POST /:id/collaborators` - Add collaborator
+- `GET /:id/collaborators` - Get trip collaborators
+- `DELETE /:id/collaborators/:userId` - Remove collaborator
+
+#### AI Recommendations (`/api/ai`)
+- `POST /itinerary` - Generate AI-powered itinerary
+- `POST /recommendations` - Get category-specific recommendations
+- `POST /enhance-trip/:tripId` - Enhance existing trip with AI suggestions
+
+#### Collaboration (`/api/collaboration`)
+- `GET /token/:tripId` - Get Web PubSub access token
+- `POST /join/:tripId` - Join collaboration session
+- `POST /leave/:tripId` - Leave collaboration session
+- `GET /status/:tripId` - Get collaboration status
+
+## 🗄️ Database Schema
+
+### Users Table
+```sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    azure_ad_id VARCHAR(255) UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+### Trips Table
+```sql
+CREATE TABLE trips (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    destination JSONB,
+    budget DECIMAL(10,2),
+    currency VARCHAR(3) DEFAULT 'USD',
+    status trip_status DEFAULT 'planning',
+    created_by UUID NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+### Trip Collaborators Table
+```sql
+CREATE TABLE trip_collaborators (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    trip_id UUID NOT NULL REFERENCES trips(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    role collaboration_role DEFAULT 'viewer',
+    invited_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    accepted_at TIMESTAMP WITH TIME ZONE,
+    UNIQUE(trip_id, user_id)
+);
+```
+
+## 🔧 Configuration
+
+### Required Environment Variables
+
+```bash
+# Server
+PORT=3000
+NODE_ENV=development
+
+# Database
+POSTGRES_HOST=localhost
+POSTGRES_DB=travel_planning
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_password
+
+# Azure Services
+AZURE_AD_B2C_TENANT_ID=your-tenant
+AZURE_AD_B2C_CLIENT_ID=your-client-id
+AZURE_KEYVAULT_URL=https://your-vault.vault.azure.net/
+COSMOS_DB_ENDPOINT=https://your-cosmos.documents.azure.com/
+AZURE_OPENAI_ENDPOINT=https://your-openai.openai.azure.com/
+# ... see .env.example for complete list
+```
+
+### Azure Services Setup
+
+1. **Azure AD B2C**: Configure tenant and application registration
+2. **PostgreSQL**: Azure Database for PostgreSQL or local instance
+3. **Cosmos DB**: MongoDB API with partition key `/tripId`
+4. **Key Vault**: Store connection strings and API keys
+5. **Service Bus**: Create `trip-commands` and `trip-events` queues
+6. **Web PubSub**: Configure `collaborationHub` hub
+7. **OpenAI**: Deploy GPT-4 model for AI features
+
+## 🏗️ Project Structure
+
+```
+src/
+├── api/
+│   ├── middleware/
+│   │   └── auth.ts          # JWT validation middleware
+│   └── routes/
+│       ├── ai.ts            # AI recommendation endpoints
+│       ├── collaboration.ts # Real-time collaboration
+│       ├── trips.ts         # Trip management
+│       └── users.ts         # User management
+├── config/
+│   └── database.ts          # Database connection config
+├── features/
+│   └── trips/               # CQRS command/query handlers
+├── lib/
+│   ├── cosmos.ts            # Cosmos DB client and operations
+│   ├── eventhubs.ts         # Event Hubs integration
+│   ├── keyvault.ts          # Key Vault secret management
+│   ├── migrations.ts        # Database migration system
+│   ├── openai.ts            # Azure OpenAI integration
+│   ├── search.ts            # Cognitive Search integration
+│   ├── servicebus.ts        # Service Bus messaging
+│   └── webpubsub.ts         # Web PubSub real-time features
+├── models/
+│   ├── trip.ts              # Trip entity and repository
+│   └── user.ts              # User entity and repository
+└── server.ts                # Main application entry point
+```
+
+## 🔒 Security Features
+
+- **JWT Authentication** with Azure AD B2C
+- **Row-Level Security** for data isolation
+- **API Rate Limiting** via Azure API Management
+- **Secret Management** with Azure Key Vault
+- **CORS Configuration** for cross-origin requests
+- **Input Validation** and sanitization
+- **Error Handling** with secure error messages
+
+## 🚀 Deployment
+
+### Azure Container Apps (Recommended)
+```yaml
+# azure-container-app.yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+```
+
+### Docker
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY dist ./dist
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+## 🔍 Monitoring & Observability
+
+- **Health Checks**: `/health` endpoint for service monitoring
+- **Structured Logging**: JSON formatted logs for Azure Monitor
+- **Error Tracking**: Comprehensive error handling and reporting
+- **Performance Metrics**: Integration with Azure Application Insights
+
+## 📝 Development Notes
+
+### CQRS Pattern
+- **Commands**: Write operations that modify state
+- **Queries**: Read operations from optimized read models
+- **Events**: Published to Service Bus for downstream processing
+
+### Data Sync
+- PostgreSQL serves as the primary data store
+- Cosmos DB contains denormalized read models
+- Event-driven sync keeps read models updated
+
+### Real-time Features
+- Web PubSub manages WebSocket connections
+- Group-based messaging for trip collaboration
+- Presence tracking for active collaborators
+
+---
+
+# Original System Overview
 
 This is a comprehensive, AI-powered travel planning system designed for real-time collaboration. It leverages a sophisticated architecture with Azure integration to provide a seamless and intelligent travel planning experience.
 
