@@ -1,0 +1,36 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hsh-2025-hackthon/back-end.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/hsh-2025-hackthon/back-end/issues"
+  },
+  "homepage": "https://github.com/hsh-2025-hackthon/back-end#readme",
+  "devDependencies": {
+    "@types/node": "^24.0.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.4.1",
+    "@azure/event-hubs": "^6.0.0",
+    "@azure/identity": "^4.10.2",
+    "@azure/keyvault-secrets": "^4.10.0",
+    "@azure/service-bus": "^7.9.5",
+    "@azure/web-pubsub": "^1.2.0",
+    "express": "^5.1.0",
+    "pg": "^8.16.3"
+  }
+}
