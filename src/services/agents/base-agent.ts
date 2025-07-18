@@ -119,11 +119,13 @@ export abstract class BaseAgent {
   /**
    * Log agent activity for monitoring and debugging
    */
-  protected logActivity(
+  protected async logActivity(
     context: AgentContext,
     action: string,
-    details?: any
-  ): void {
+    details?: any,
+    level: 'debug' | 'info' | 'warn' | 'error' = 'info'
+  ): Promise<void> {
+    // Console logging for development
     console.log(`[${this.agentName}] ${action}`, {
       tripId: context.tripId,
       userId: context.userId,
@@ -131,6 +133,65 @@ export abstract class BaseAgent {
       timestamp: context.timestamp,
       details
     });
+
+    // Persistent logging if sessionId is available
+    if (context.sessionId) {
+      try {
+        const { agentSessionService } = await import('./agent-session-service');
+        await agentSessionService.addLog(
+          context.sessionId,
+          level,
+          action,
+          this.agentName,
+          this.getCurrentStep(),
+          details
+        );
+      } catch (error) {
+        console.warn(`Failed to log activity for session ${context.sessionId}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Log error with structured error details
+   */
+  protected async logError(
+    context: AgentContext,
+    error: Error | string,
+    details?: any
+  ): Promise<void> {
+    const errorMessage = error instanceof Error ? error.message : error;
+    const errorDetails = error instanceof Error ? {
+      code: 'AGENT_ERROR',
+      stack: error.stack,
+      details: details || {}
+    } : { details: details || {} };
+
+    await this.logActivity(context, `Error: ${errorMessage}`, details, 'error');
+
+    if (context.sessionId) {
+      try {
+        const { agentSessionService } = await import('./agent-session-service');
+        await agentSessionService.addLog(
+          context.sessionId,
+          'error',
+          errorMessage,
+          this.agentName,
+          this.getCurrentStep(),
+          details,
+          errorDetails
+        );
+      } catch (logError) {
+        console.warn(`Failed to log error for session ${context.sessionId}:`, logError);
+      }
+    }
+  }
+
+  /**
+   * Get current processing step (override in subclasses for specific steps)
+   */
+  protected getCurrentStep(): string {
+    return 'processing';
   }
 
   /**
