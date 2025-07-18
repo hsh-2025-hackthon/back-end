@@ -1702,6 +1702,152 @@ paths:
               schema:
                 type: string
                 format: binary
+  /health:
+    get:
+      summary: Get overall system health
+      description: Returns the overall health status of the system including all services.
+      tags:
+        - Health Monitoring
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: System is degraded or unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '500':
+          description: Health check failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /health/services:
+    get:
+      summary: Get detailed service health
+      description: Returns detailed health information for all monitored services.
+      tags:
+        - Health Monitoring
+      responses:
+        '200':
+          description: Service health details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceHealthResponse'
+        '500':
+          description: Failed to get service health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /health/services/{serviceName}:
+    get:
+      summary: Get health for a specific service
+      description: Returns health status for a specific service by name.
+      tags:
+        - Health Monitoring
+      parameters:
+        - name: serviceName
+          in: path
+          required: true
+          description: Name of the service to check (e.g., "Azure OpenAI", "MCP weather")
+          schema:
+            type: string
+            example: "Azure OpenAI"
+      responses:
+        '200':
+          description: Service health details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SingleServiceHealthResponse'
+        '404':
+          description: Service not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get service health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /health/azure:
+    get:
+      summary: Get Azure services health
+      description: Returns health status for all Azure-specific services.
+      tags:
+        - Health Monitoring
+      responses:
+        '200':
+          description: Azure services are healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryHealthResponse'
+        '503':
+          description: Some Azure services are unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryHealthResponse'
+        '500':
+          description: Failed to get Azure service health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /health/mcp:
+    get:
+      summary: Get MCP services health
+      description: Returns health status for all Model Context Protocol (MCP) services.
+      tags:
+        - Health Monitoring
+      responses:
+        '200':
+          description: MCP services are healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryHealthResponse'
+        '503':
+          description: Some MCP services are unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryHealthResponse'
+        '500':
+          description: Failed to get MCP service health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /health/refresh:
+    post:
+      summary: Force refresh health checks
+      description: Forces a refresh of all health checks, bypassing the cache.
+      tags:
+        - Health Monitoring
+      responses:
+        '200':
+          description: Health checks refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthRefreshResponse'
+        '500':
+          description: Failed to refresh health checks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     Trip:
@@ -2588,6 +2734,181 @@ components:
           type: string
         imageUrl:
           type: string
+    # Health Monitoring Schemas
+    ServiceHealth:
+      type: object
+      properties:
+        service:
+          type: string
+          description: Name of the service
+          example: "Azure OpenAI"
+        status:
+          type: string
+          enum: [healthy, unhealthy, unknown]
+          description: Current health status of the service
+          example: "healthy"
+        message:
+          type: string
+          description: Additional information about the service status
+          example: "Service is operational"
+        responseTime:
+          type: number
+          description: Response time in milliseconds
+          example: 245
+        timestamp:
+          type: string
+          format: date-time
+          description: When the health check was performed
+          example: "2025-07-19T12:00:00.000Z"
+      required:
+        - service
+        - status
+        - timestamp
+    HealthSummary:
+      type: object
+      properties:
+        total:
+          type: number
+          description: Total number of services monitored
+          example: 10
+        healthy:
+          type: number
+          description: Number of healthy services
+          example: 8
+        unhealthy:
+          type: number
+          description: Number of unhealthy services
+          example: 2
+        unknown:
+          type: number
+          description: Number of services with unknown status
+          example: 0
+      required:
+        - total
+        - healthy
+        - unhealthy
+        - unknown
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unknown, error]
+          description: Overall system health status
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          description: When the health check was performed
+          example: "2025-07-19T12:00:00.000Z"
+        version:
+          type: string
+          description: Application version
+          example: "1.0.0"
+        summary:
+          $ref: '#/components/schemas/HealthSummary'
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceHealth'
+          description: Health status of all monitored services
+      required:
+        - status
+        - timestamp
+        - version
+        - summary
+        - services
+    ServiceHealthResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: When the health check was performed
+          example: "2025-07-19T12:00:00.000Z"
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceHealth'
+          description: Health status of all monitored services
+      required:
+        - timestamp
+        - services
+    SingleServiceHealthResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: When the health check was performed
+          example: "2025-07-19T12:00:00.000Z"
+        service:
+          $ref: '#/components/schemas/ServiceHealth'
+      required:
+        - timestamp
+        - service
+    CategoryHealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unknown]
+          description: Overall status for this service category
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          description: When the health check was performed
+          example: "2025-07-19T12:00:00.000Z"
+        summary:
+          $ref: '#/components/schemas/HealthSummary'
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceHealth'
+          description: Health status of services in this category
+      required:
+        - status
+        - timestamp
+        - summary
+        - services
+    HealthRefreshResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Confirmation message
+          example: "Health checks refreshed"
+        timestamp:
+          type: string
+          format: date-time
+          description: When the refresh was performed
+          example: "2025-07-19T12:00:00.000Z"
+        summary:
+          $ref: '#/components/schemas/HealthSummary'
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceHealth'
+          description: Updated health status of all services
+      required:
+        - message
+        - timestamp
+        - summary
+        - services
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Service not found"
+        message:
+          type: string
+          description: Detailed error description
+          example: "The requested service could not be found"
+      required:
+        - error
   securitySchemes:
     bearerAuth:
       type: http

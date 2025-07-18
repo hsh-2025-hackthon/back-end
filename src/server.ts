@@ -2,6 +2,8 @@ import express from 'express';
 import { runMigrations } from './lib/migrations';
 import { testConnection } from './config/database';
 import { tripEventProcessor } from './features/trips/trip-event-processor';
+import { mcpManager } from './features/mcp/mcp-manager';
+import { serviceHealthManager } from './lib/service-health';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -17,6 +19,7 @@ import votesRouter from './api/routes/votes';
 import expensesRouter from './api/routes/expenses';
 import mcpRouter from './api/routes/mcp';
 import notificationsRouter from './api/routes/notifications';
+import healthRouter from './api/routes/health';
 
 // Middleware
 app.use(express.json());
@@ -36,12 +39,64 @@ app.use((req, res, next) => {
 });
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '1.0.0'
-  });
+app.get('/health', async (req, res) => {
+  try {
+    const healthChecks = await serviceHealthManager.getServiceHealth() as any[];
+    const summary = serviceHealthManager.getHealthSummary();
+    
+    const overallStatus = summary.unhealthy > 0 ? 'degraded' : 
+                         summary.unknown > 0 ? 'unknown' : 'healthy';
+    
+    res.status(overallStatus === 'healthy' ? 200 : 503).json({ 
+      status: overallStatus,
+      timestamp: new Date().toISOString(),
+      version: process.env.npm_package_version || '1.0.0',
+      summary,
+      services: healthChecks
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      message: 'Health check failed',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Detailed health check endpoint for each service category
+app.get('/health/services', async (req, res) => {
+  try {
+    const healthChecks = await serviceHealthManager.getServiceHealth() as any[];
+    res.json({
+      timestamp: new Date().toISOString(),
+      services: healthChecks
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to get service health',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// MCP-specific health check endpoint
+app.get('/health/mcp', async (req, res) => {
+  try {
+    const mcpHealth = await mcpManager.getServiceHealth();
+    const availableServices = mcpManager.getAvailableServices();
+    
+    res.json({
+      timestamp: new Date().toISOString(),
+      availableServices,
+      health: mcpHealth
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to get MCP health',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 });
 
 // API routes
@@ -55,6 +110,7 @@ app.use('/api', votesRouter);
 app.use('/api', expensesRouter);
 app.use('/api/mcp', mcpRouter);
 app.use('/api', notificationsRouter);
+app.use('/health', healthRouter);
 
 
 // Error handling middleware
@@ -95,9 +151,37 @@ async function startServer() {
       }
     }
 
+    // Check third-party services health
+    console.log('Checking third-party services...');
+    try {
+      const serviceHealth = await serviceHealthManager.checkAllServices();
+      const summary = serviceHealthManager.getHealthSummary();
+      
+      console.log(`\n🔍 Service Health Summary:`);
+      console.log(`   Total: ${summary.total} | Healthy: ${summary.healthy} | Unhealthy: ${summary.unhealthy} | Unknown: ${summary.unknown}`);
+      
+      serviceHealth.forEach(service => {
+        const statusIcon = service.status === 'healthy' ? '✅' : 
+                          service.status === 'unhealthy' ? '❌' : '❓';
+        const responseTime = service.responseTime ? ` (${service.responseTime}ms)` : '';
+        console.log(`   ${statusIcon} ${service.service}${responseTime}`);
+        if (service.message && service.status !== 'healthy') {
+          console.log(`      └─ ${service.message}`);
+        }
+      });
+      
+      if (summary.unhealthy > 0) {
+        console.warn(`\n⚠️  ${summary.unhealthy} service(s) are unhealthy - some features may not work properly`);
+      }
+      
+    } catch (error) {
+      console.error('Failed to check third-party services:', error);
+      console.warn('Server will start but some external features may not work');
+    }
+
     // Start event processor for CQRS read model synchronization
     try {
-      console.log('Starting event processor...');
+      console.log('\nStarting event processor...');
       await tripEventProcessor.start();
       console.log('Event processor started');
     } catch (error) {
@@ -107,8 +191,10 @@ async function startServer() {
     
     // Start server
     app.listen(port, () => {
-      console.log(`🚀 Server is running on port ${port}`);
+      console.log(`\n🚀 Server is running on port ${port}`);
       console.log(`📚 Health check: http://localhost:${port}/health`);
+      console.log(`🔍 Service health: http://localhost:${port}/health/services`);
+      console.log(`🔧 MCP health: http://localhost:${port}/health/mcp`);
       console.log(`🔧 API endpoints: http://localhost:${port}/api/`);
       
       if (process.env.NODE_ENV === 'development') {
@@ -128,12 +214,14 @@ async function startServer() {
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received. Shutting down gracefully...');
   await tripEventProcessor.stop();
+  mcpManager.shutdown();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received. Shutting down gracefully...');
   await tripEventProcessor.stop();
+  mcpManager.shutdown();
   process.exit(0);
 });
 
