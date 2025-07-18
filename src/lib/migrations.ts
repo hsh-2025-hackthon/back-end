@@ -224,74 +224,115 @@ const migrations: Migration[] = [
   },
   {
     id: '008',
-    name: 'create_budget_management_tables',
+    name: 'create_expense_management_system',
     up: `
-      -- Expenses table
-      CREATE TABLE IF NOT EXISTS expenses (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-          user_id UUID NOT NULL REFERENCES users(id),
-          title VARCHAR(255) NOT NULL,
-          amount DECIMAL(10,2) NOT NULL,
-          currency VARCHAR(3) NOT NULL,
-          amount_base_currency DECIMAL(10,2),
-          category VARCHAR(100) NOT NULL,
-          subcategory VARCHAR(100),
-          description TEXT,
-          receipt_image_url TEXT,
-          receipt_data JSONB,
-          location JSONB,
-          expense_date DATE NOT NULL,
-          participants JSONB NOT NULL,
-          split_method VARCHAR(50) DEFAULT 'equal',
-          split_data JSONB,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
+      -- Create updated_at trigger function
+      CREATE OR REPLACE FUNCTION update_updated_at_column()
+      RETURNS TRIGGER AS $$
+      BEGIN
+          NEW.updated_at = NOW();
+          RETURN NEW;
+      END;
+      $$ language 'plpgsql';
 
-      CREATE INDEX idx_expenses_trip_id ON expenses(trip_id);
-      CREATE INDEX idx_expenses_user_id ON expenses(user_id);
-      CREATE INDEX idx_expenses_date ON expenses(expense_date);
-
-      -- Expense splits table
-      CREATE TABLE IF NOT EXISTS expense_splits (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          expense_id UUID NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
-          user_id UUID NOT NULL REFERENCES users(id),
-          amount DECIMAL(10,2) NOT NULL,
-          currency VARCHAR(3) NOT NULL,
-          amount_base_currency DECIMAL(10,2),
-          paid_by_user_id UUID NOT NULL REFERENCES users(id),
-          status VARCHAR(50) DEFAULT 'pending',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          UNIQUE(expense_id, user_id)
-      );
-
-      CREATE INDEX idx_expense_splits_expense_id ON expense_splits(expense_id);
-      CREATE INDEX idx_expense_splits_user_id ON expense_splits(user_id);
-
-      -- Budgets table
+      -- Create budgets table
       CREATE TABLE IF NOT EXISTS budgets (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-          category VARCHAR(100),
-          total_amount DECIMAL(10,2) NOT NULL,
-          currency VARCHAR(3) NOT NULL,
-          spent_amount DECIMAL(10,2) DEFAULT 0,
-          alert_threshold DECIMAL(3,2) DEFAULT 0.8,
-          created_by UUID NOT NULL REFERENCES users(id),
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+        total_amount DECIMAL(12,2) NOT NULL CHECK (total_amount > 0),
+        currency VARCHAR(3) NOT NULL,
+        category_limits JSONB DEFAULT '{}',
+        created_by UUID NOT NULL REFERENCES users(id),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
-      CREATE INDEX idx_budgets_trip_id ON budgets(trip_id);
-      CREATE INDEX idx_budgets_category ON budgets(category);
+      -- Create expenses table
+      CREATE TABLE IF NOT EXISTS expenses (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id),
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        amount DECIMAL(12,2) NOT NULL CHECK (amount > 0),
+        currency VARCHAR(3) NOT NULL,
+        category VARCHAR(100) NOT NULL,
+        subcategory VARCHAR(100),
+        tags TEXT[], -- Array of tags
+        payer_id UUID NOT NULL REFERENCES users(id),
+        expense_date TIMESTAMP WITH TIME ZONE NOT NULL,
+        receipt_url TEXT,
+        is_reimbursable BOOLEAN DEFAULT true,
+        split_method VARCHAR(20) NOT NULL DEFAULT 'equal' 
+          CHECK (split_method IN ('equal', 'exact', 'percentage', 'shares')),
+        split_data JSONB DEFAULT '{}', -- Stores split calculations
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Create expense_splits table for tracking individual splits
+      CREATE TABLE IF NOT EXISTS expense_splits (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        expense_id UUID NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id),
+        amount DECIMAL(12,2) NOT NULL,
+        percentage DECIMAL(5,2), -- For percentage splits
+        shares INTEGER, -- For share-based splits
+        is_settled BOOLEAN DEFAULT false,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        
+        UNIQUE(expense_id, user_id)
+      );
+
+      -- Create settlements table for tracking debt resolution
+      CREATE TABLE IF NOT EXISTS settlements (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+        from_user_id UUID NOT NULL REFERENCES users(id),
+        to_user_id UUID NOT NULL REFERENCES users(id),
+        amount DECIMAL(12,2) NOT NULL CHECK (amount > 0),
+        currency VARCHAR(3) NOT NULL,
+        description TEXT,
+        settled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        created_by UUID NOT NULL REFERENCES users(id),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        
+        CHECK (from_user_id != to_user_id)
+      );
+
+      -- Create indexes for better performance
+      CREATE INDEX IF NOT EXISTS idx_budgets_trip_id ON budgets(trip_id);
+      CREATE INDEX IF NOT EXISTS idx_expenses_trip_id ON expenses(trip_id);
+      CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON expenses(user_id);
+      CREATE INDEX IF NOT EXISTS idx_expenses_payer_id ON expenses(payer_id);
+      CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date);
+      CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
+      CREATE INDEX IF NOT EXISTS idx_expense_splits_expense_id ON expense_splits(expense_id);
+      CREATE INDEX IF NOT EXISTS idx_expense_splits_user_id ON expense_splits(user_id);
+      CREATE INDEX IF NOT EXISTS idx_settlements_trip_id ON settlements(trip_id);
+      CREATE INDEX IF NOT EXISTS idx_settlements_from_user ON settlements(from_user_id);
+      CREATE INDEX IF NOT EXISTS idx_settlements_to_user ON settlements(to_user_id);
+
+      -- Apply triggers to tables
+      CREATE TRIGGER update_budgets_updated_at BEFORE UPDATE ON budgets 
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+      CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses 
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+      CREATE TRIGGER update_expense_splits_updated_at BEFORE UPDATE ON expense_splits 
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     `,
     down: `
-      DROP TABLE IF EXISTS budgets;
+      DROP TRIGGER IF EXISTS update_expense_splits_updated_at ON expense_splits;
+      DROP TRIGGER IF EXISTS update_expenses_updated_at ON expenses;
+      DROP TRIGGER IF EXISTS update_budgets_updated_at ON budgets;
+      DROP TABLE IF EXISTS settlements;
       DROP TABLE IF EXISTS expense_splits;
       DROP TABLE IF EXISTS expenses;
+      DROP TABLE IF EXISTS budgets;
+      DROP FUNCTION IF EXISTS update_updated_at_column();
     `
   }
 ];

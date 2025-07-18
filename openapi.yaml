@@ -1371,6 +1371,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlaceData'
+  /mcp/routes/plan:
+    post:
+      summary: Plan a route between multiple locations
+      description: Calculates an optimized route based on a list of coordinates.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoutePlanRequest'
+      responses:
+        '200':
+          description: Route plan successfully generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutePlanResponse'
+        '400':
+          description: Invalid route planning data.
   /booking/flights/search:
     post:
       summary: Search for flight options
