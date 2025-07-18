@@ -12,6 +12,8 @@ import usersRouter from './api/routes/users';
 import collaborationRouter from './api/routes/collaboration';
 import aiRouter from './api/routes/ai';
 import authRouter from './api/routes/auth';
+import chatRouter from './api/routes/chat';
+import votesRouter from './api/routes/votes';
 
 // Middleware
 app.use(express.json());
@@ -45,6 +47,8 @@ app.use('/api/trips', tripsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/collaboration', collaborationRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api', chatRouter);
+app.use('/api', votesRouter);
 
 
 // Error handling middleware

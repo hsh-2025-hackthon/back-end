@@ -115,6 +115,184 @@ const migrations: Migration[] = [
       );
     `,
     down: `DROP TABLE IF EXISTS migration_history;`
+  },
+  {
+    id: '006',
+    name: 'create_chat_system_tables',
+    up: `
+      -- Chat rooms table
+      CREATE TABLE IF NOT EXISTS chat_rooms (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        is_default BOOLEAN DEFAULT FALSE,
+        created_by UUID NOT NULL REFERENCES users(id),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      
+      CREATE INDEX idx_chat_rooms_trip_id ON chat_rooms(trip_id);
+      CREATE INDEX idx_chat_rooms_created_by ON chat_rooms(created_by);
+      
+      -- Chat messages table
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        room_id UUID NOT NULL REFERENCES chat_rooms(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id),
+        content TEXT NOT NULL,
+        message_type VARCHAR(50) DEFAULT 'text',
+        metadata JSONB DEFAULT '{}',
+        replied_to UUID REFERENCES chat_messages(id),
+        edited_at TIMESTAMP WITH TIME ZONE,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      
+      CREATE INDEX idx_chat_messages_room_id_created_at ON chat_messages(room_id, created_at DESC);
+      CREATE INDEX idx_chat_messages_user_id ON chat_messages(user_id);
+      CREATE INDEX idx_chat_messages_type ON chat_messages(message_type);
+      
+      -- Chat room members table
+      CREATE TABLE IF NOT EXISTS chat_room_members (
+        room_id UUID NOT NULL REFERENCES chat_rooms(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id),
+        role VARCHAR(50) DEFAULT 'member',
+        permissions JSONB DEFAULT '["read", "write"]',
+        joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        last_read_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        notification_enabled BOOLEAN DEFAULT TRUE,
+        PRIMARY KEY (room_id, user_id)
+      );
+      
+      CREATE INDEX idx_room_members_user_id ON chat_room_members(user_id);
+    `,
+    down: `
+      DROP TABLE IF EXISTS chat_room_members;
+      DROP TABLE IF EXISTS chat_messages;
+      DROP TABLE IF EXISTS chat_rooms;
+    `
+  },
+  {
+    id: '007',
+    name: 'create_voting_system_tables',
+    up: `
+      -- Votes table
+      CREATE TABLE IF NOT EXISTS votes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+        chat_message_id UUID REFERENCES chat_messages(id),
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        vote_type VARCHAR(50) NOT NULL,
+        options JSONB NOT NULL,
+        settings JSONB DEFAULT '{}',
+        creator_id UUID NOT NULL REFERENCES users(id),
+        deadline TIMESTAMP WITH TIME ZONE,
+        status VARCHAR(50) DEFAULT 'active',
+        result_summary JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      
+      CREATE INDEX idx_votes_trip_id ON votes(trip_id);
+      CREATE INDEX idx_votes_status_deadline ON votes(status, deadline);
+      CREATE INDEX idx_votes_creator_id ON votes(creator_id);
+      
+      -- Vote responses table
+      CREATE TABLE IF NOT EXISTS vote_responses (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        vote_id UUID NOT NULL REFERENCES votes(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id),
+        selected_options JSONB NOT NULL,
+        ranking JSONB,
+        comment TEXT,
+        is_anonymous BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(vote_id, user_id)
+      );
+      
+      CREATE INDEX idx_vote_responses_vote_id ON vote_responses(vote_id);
+      CREATE INDEX idx_vote_responses_user_id ON vote_responses(user_id);
+    `,
+    down: `
+      DROP TABLE IF EXISTS vote_responses;
+      DROP TABLE IF EXISTS votes;
+    `
+  },
+  {
+    id: '008',
+    name: 'create_budget_management_tables',
+    up: `
+      -- Expenses table
+      CREATE TABLE IF NOT EXISTS expenses (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+          user_id UUID NOT NULL REFERENCES users(id),
+          title VARCHAR(255) NOT NULL,
+          amount DECIMAL(10,2) NOT NULL,
+          currency VARCHAR(3) NOT NULL,
+          amount_base_currency DECIMAL(10,2),
+          category VARCHAR(100) NOT NULL,
+          subcategory VARCHAR(100),
+          description TEXT,
+          receipt_image_url TEXT,
+          receipt_data JSONB,
+          location JSONB,
+          expense_date DATE NOT NULL,
+          participants JSONB NOT NULL,
+          split_method VARCHAR(50) DEFAULT 'equal',
+          split_data JSONB,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE INDEX idx_expenses_trip_id ON expenses(trip_id);
+      CREATE INDEX idx_expenses_user_id ON expenses(user_id);
+      CREATE INDEX idx_expenses_date ON expenses(expense_date);
+
+      -- Expense splits table
+      CREATE TABLE IF NOT EXISTS expense_splits (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          expense_id UUID NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+          user_id UUID NOT NULL REFERENCES users(id),
+          amount DECIMAL(10,2) NOT NULL,
+          currency VARCHAR(3) NOT NULL,
+          amount_base_currency DECIMAL(10,2),
+          paid_by_user_id UUID NOT NULL REFERENCES users(id),
+          status VARCHAR(50) DEFAULT 'pending',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(expense_id, user_id)
+      );
+
+      CREATE INDEX idx_expense_splits_expense_id ON expense_splits(expense_id);
+      CREATE INDEX idx_expense_splits_user_id ON expense_splits(user_id);
+
+      -- Budgets table
+      CREATE TABLE IF NOT EXISTS budgets (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+          category VARCHAR(100),
+          total_amount DECIMAL(10,2) NOT NULL,
+          currency VARCHAR(3) NOT NULL,
+          spent_amount DECIMAL(10,2) DEFAULT 0,
+          alert_threshold DECIMAL(3,2) DEFAULT 0.8,
+          created_by UUID NOT NULL REFERENCES users(id),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE INDEX idx_budgets_trip_id ON budgets(trip_id);
+      CREATE INDEX idx_budgets_category ON budgets(category);
+    `,
+    down: `
+      DROP TABLE IF EXISTS budgets;
+      DROP TABLE IF EXISTS expense_splits;
+      DROP TABLE IF EXISTS expenses;
+    `
   }
 ];
 
@@ -133,7 +311,7 @@ export const runMigrations = async (): Promise<void> => {
     const executedMigrations = new Set(result.rows.map(row => row.id));
 
     // Run pending migrations
-    for (const migration of migrations.slice(0, 4)) { // Skip migration_history creation
+    for (const migration of migrations.slice(0, 8)) { // Include the new migration
       if (!executedMigrations.has(migration.id)) {
         console.log(`Running migration ${migration.id}: ${migration.name}`);
         await client.query(migration.up);
