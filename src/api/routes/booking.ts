@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { bookingSearchService } from '../../features/booking/booking-search-service';
 import { SkyscannerFlightProvider } from '../../features/booking/providers/skyscanner-flight-provider';
+import { BookingComHotelProvider } from '../../features/booking/providers/booking-com-hotel-provider';
+import { ExpediaHotelProvider } from '../../features/booking/providers/expedia-hotel-provider';
 import { 
   BookingSearchParams
 } from '../../features/booking/booking-provider';
@@ -18,13 +20,21 @@ const initializeProviders = () => {
     apiKey: process.env.SKYSCANNER_API_KEY || 'mock-api-key'
   });
   
-  bookingSearchService.registerProvider(skyscannerProvider);
+  // Initialize Booking.com (mock for now)
+  const bookingComProvider = new BookingComHotelProvider({
+    apiKey: process.env.BOOKING_COM_API_KEY || 'mock-api-key'
+  });
   
-  // TODO: Add more providers here in future sessions
-  // - Hotels.com
-  // - Booking.com  
-  // - Expedia
-  // - etc.
+  // Initialize Expedia (mock for now)
+  const expediaProvider = new ExpediaHotelProvider({
+    apiKey: process.env.EXPEDIA_API_KEY || 'mock-api-key'
+  });
+  
+  bookingSearchService.registerProvider(skyscannerProvider);
+  bookingSearchService.registerProvider(bookingComProvider);
+  bookingSearchService.registerProvider(expediaProvider);
+  
+  console.log('Initialized booking providers: Skyscanner (flights), Booking.com (hotels), Expedia (hotels)');
 };
 
 // Initialize providers on startup
@@ -152,12 +162,19 @@ router.post('/hotels/search', requireAuth, async (req: Request, res: Response) =
       budget
     };
 
-    // For now, return a placeholder response since we haven't implemented hotel providers yet
+    const searchFilters: SearchFilters | undefined = filters;
+
+    const results = await bookingSearchService.search(searchParams, searchFilters);
+
     res.json({
       success: true,
-      message: 'Hotel search functionality will be implemented in the next phase',
-      searchParams,
-      note: 'Currently focusing on flight booking integration'
+      searchId: results.searchId,
+      timestamp: results.timestamp,
+      totalProviders: results.totalProviders,
+      totalResults: results.totalResults,
+      results: results.results,
+      filters: results.filters,
+      searchParams
     });
 
   } catch (error) {
@@ -255,23 +272,27 @@ router.post('/:bookingId/confirm', requireAuth, async (req: Request, res: Respon
  */
 router.get('/providers/status', requireAuth, async (req: Request, res: Response) => {
   try {
-    const availability = await bookingSearchService.getProviderAvailability();
+    const healthStatus = bookingSearchService.getProviderHealthStatus();
     const providers = bookingSearchService.getProviders();
 
     const providerStatus = providers.map(provider => ({
       name: provider.name,
       type: provider.type,
-      available: availability[provider.name] || false,
+      healthy: healthStatus[provider.name]?.healthy || false,
+      circuitBreakerState: healthStatus[provider.name]?.circuitBreakerStats?.state || 'UNKNOWN',
       lastChecked: new Date().toISOString()
     }));
+
+    const healthyCount = Object.values(healthStatus).filter(status => status.healthy).length;
 
     res.json({
       success: true,
       providers: providerStatus,
+      healthStatus,
       summary: {
         total: providers.length,
-        available: Object.values(availability).filter(Boolean).length,
-        unavailable: Object.values(availability).filter(status => !status).length
+        healthy: healthyCount,
+        unhealthy: providers.length - healthyCount
       }
     });
 
@@ -279,6 +300,83 @@ router.get('/providers/status', requireAuth, async (req: Request, res: Response)
     console.error('Provider status check error:', error);
     res.status(500).json({
       error: 'Failed to check provider status',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * POST /api/booking/providers/health-check
+ * Trigger a health check for all providers
+ */
+router.post('/providers/health-check', requireAuth, async (req: Request, res: Response) => {
+  try {
+    await bookingSearchService.triggerHealthCheck();
+
+    res.json({
+      success: true,
+      message: 'Health check completed for all providers',
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({
+      error: 'Failed to perform health check',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * POST /api/booking/circuit-breakers/reset
+ * Reset all circuit breakers
+ */
+router.post('/circuit-breakers/reset', requireAuth, async (req: Request, res: Response) => {
+  try {
+    bookingSearchService.resetCircuitBreakers();
+
+    res.json({
+      success: true,
+      message: 'All circuit breakers have been reset',
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Circuit breaker reset error:', error);
+    res.status(500).json({
+      error: 'Failed to reset circuit breakers',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * PUT /api/booking/config
+ * Update booking service configuration
+ */
+router.put('/config', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { enableFailover, maxRetries } = req.body;
+
+    if (typeof enableFailover === 'boolean') {
+      bookingSearchService.setFailoverEnabled(enableFailover);
+    }
+
+    if (typeof maxRetries === 'number') {
+      bookingSearchService.setMaxRetries(maxRetries);
+    }
+
+    res.json({
+      success: true,
+      message: 'Booking service configuration updated',
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Config update error:', error);
+    res.status(500).json({
+      error: 'Failed to update configuration',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }

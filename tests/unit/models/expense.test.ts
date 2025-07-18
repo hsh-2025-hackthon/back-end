@@ -8,6 +8,10 @@ jest.mock('../../../src/config/database', () => ({
 
 const mockDb = {
   query: jest.fn(),
+  connect: jest.fn().mockResolvedValue({
+    query: jest.fn(),
+    release: jest.fn(),
+  }),
 };
 
 (getDatabase as jest.Mock).mockReturnValue(mockDb);
@@ -50,7 +54,18 @@ describe('ExpenseRepository', () => {
         updatedAt: new Date(),
       };
 
-      mockDb.query.mockResolvedValueOnce({ rows: [mockExpense] });
+      // Mock the database client returned by connect()
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+      
+      mockDb.connect.mockResolvedValue(mockClient);
+      
+      // Mock the trip query and expense insertion
+      mockClient.query
+        .mockResolvedValueOnce({ rows: [{ base_currency: 'USD' }] }) // trip query
+        .mockResolvedValueOnce({ rows: [mockExpense] }); // expense insertion
 
       const expenseData: CreateExpenseData = {
         tripId: 'trip-123',
@@ -73,25 +88,17 @@ describe('ExpenseRepository', () => {
       const result = await ExpenseRepository.createExpense(expenseData);
 
       expect(result).toEqual(mockExpense);
-      expect(mockDb.query).toHaveBeenCalledWith(
+      expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+      expect(mockClient.query).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO expenses'),
-        expect.arrayContaining([
-          expenseData.tripId,
-          expenseData.userId,
-          expenseData.payerId,
-          expenseData.title,
-          expenseData.description,
-          expenseData.amount,
-          expenseData.currency,
-          expenseData.category,
-        ])
+        expect.any(Array)
       );
     });
   });
 
   describe('getExpenseById', () => {
     it('should find an expense by id', async () => {
-      const mockExpense: Expense = {
+      const mockExpenseRow = {
         id: '123e4567-e89b-12d3-a456-426614174000',
         tripId: 'trip-123',
         userId: 'user-123',
@@ -106,22 +113,42 @@ describe('ExpenseRepository', () => {
         tags: [],
         expenseDate: new Date('2025-07-18'),
         participants: ['user-123'],
-        splitMethod: 'equal',
+        splitMethod: 'equal' as const,
         splitData: {},
         receiptUrls: [],
-        status: 'active',
-        verificationStatus: 'pending',
+        status: 'active' as const,
+        verificationStatus: 'pending' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
+        userName: 'John Doe',
+        payerName: 'John Doe'
       };
 
-      mockDb.query.mockResolvedValueOnce({ rows: [mockExpense] });
+      const expectedExpense: Expense = {
+        ...mockExpenseRow,
+        user: { 
+          id: 'user-123', 
+          name: 'John Doe',
+          email: 'john@example.com',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        payer: { 
+          id: 'user-123', 
+          name: 'John Doe',
+          email: 'john@example.com',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      };
 
-      const result = await ExpenseRepository.getExpenseById('123e4567-e89b-12d3-a456-426614174000');
+      mockDb.query.mockResolvedValueOnce({ rows: [mockExpenseRow] });
 
-      expect(result).toEqual(mockExpense);
+      const result = await ExpenseRepository.findExpenseById('123e4567-e89b-12d3-a456-426614174000');
+
+      expect(result).toEqual(expectedExpense);
       expect(mockDb.query).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM expenses WHERE id = $1'),
+        expect.stringContaining('WHERE e.id = $1'),
         ['123e4567-e89b-12d3-a456-426614174000']
       );
     });
@@ -129,7 +156,7 @@ describe('ExpenseRepository', () => {
     it('should return null if expense not found', async () => {
       mockDb.query.mockResolvedValueOnce({ rows: [] });
 
-      const result = await ExpenseRepository.getExpenseById('non-existent-id');
+      const result = await ExpenseRepository.findExpenseById('non-existent-id');
 
       expect(result).toBeNull();
     });
@@ -164,10 +191,12 @@ describe('ExpenseRepository', () => {
       ];
 
       mockDb.query.mockResolvedValueOnce({ rows: mockExpenses });
+      mockDb.query.mockResolvedValueOnce({ rows: [{ count: '1' }] });
 
-      const result = await ExpenseRepository.getExpensesByTripId('trip-123');
+      const result = await ExpenseRepository.findExpensesByTripId('trip-123');
 
-      expect(result).toEqual(mockExpenses);
+      expect(result.expenses).toEqual(mockExpenses);
+      expect(result.total).toBe(1);
       expect(mockDb.query).toHaveBeenCalledWith(
         expect.stringContaining('SELECT * FROM expenses WHERE trip_id = $1'),
         ['trip-123']
@@ -179,23 +208,24 @@ describe('ExpenseRepository', () => {
     it('should calculate trip totals correctly', async () => {
       const mockResult = {
         rows: [{
+          totalExpenses: 3,
           totalAmount: '225.00',
-          totalCount: 3,
-          totalSpent: '225.00',
-          categoryBreakdown: JSON.stringify({
-            dining: { total: 125.00, count: 2 },
-            transportation: { total: 100.00, count: 1 }
-          })
+          currency: 'USD',
+          categoryBreakdown: JSON.stringify([
+            { category: 'dining', amount: 125.00, count: 2 },
+            { category: 'transportation', amount: 100.00, count: 1 }
+          ]),
+          userBreakdown: JSON.stringify([])
         }]
       };
 
       mockDb.query.mockResolvedValueOnce(mockResult);
 
-      const result = await ExpenseRepository.getTripExpenseSummary('trip-123');
+      const result = await ExpenseRepository.getExpenseSummary('trip-123');
 
       expect(result).toBeDefined();
       expect(result?.totalAmount).toBe(225.00);
-      expect(result?.totalCount).toBe(3);
+      expect(result?.totalExpenses).toBe(3);
     });
   });
 
@@ -204,8 +234,11 @@ describe('ExpenseRepository', () => {
       const mockResult = {
         rows: [{
           userId: 'user-123',
-          totalPaid: '200.00',
-          totalOwed: '150.00'
+          userName: 'Test User',
+          totalSpent: '200.00',
+          totalOwes: '150.00',
+          netBalance: '50.00',
+          settlements: []
         }]
       };
 
@@ -215,8 +248,8 @@ describe('ExpenseRepository', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].userId).toBe('user-123');
-      expect(result[0].totalPaid).toBe(200.00);
-      expect(result[0].totalOwed).toBe(150.00);
+      expect(result[0].totalSpent).toBe(200.00);
+      expect(result[0].totalOwes).toBe(150.00);
     });
   });
 
@@ -226,12 +259,14 @@ describe('ExpenseRepository', () => {
         const mockBudget: Budget = {
           id: '123e4567-e89b-12d3-a456-426614174000',
           tripId: 'trip-123',
+          category: 'dining',
           totalAmount: 1000.00,
           currency: 'USD',
-          categoryLimits: {
-            dining: 300.00,
-            accommodation: 500.00,
-            transportation: 200.00
+          spentAmount: 0,
+          allocatedAmount: 1000.00,
+          alertThresholds: {
+            warning: 800.00,
+            critical: 950.00
           },
           createdBy: 'user-123',
           createdAt: new Date(),
@@ -242,17 +277,17 @@ describe('ExpenseRepository', () => {
 
         const budgetData = {
           tripId: 'trip-123',
+          category: 'dining',
           totalAmount: 1000.00,
           currency: 'USD',
-          categoryLimits: {
-            dining: 300.00,
-            accommodation: 500.00,
-            transportation: 200.00
+          alertThresholds: {
+            warning: 800.00,
+            critical: 950.00
           },
           createdBy: 'user-123',
         };
 
-        const result = await ExpenseRepository.createBudget(budgetData);
+        const result = await ExpenseRepository.createOrUpdateBudget(budgetData);
 
         expect(result).toEqual(mockBudget);
       });

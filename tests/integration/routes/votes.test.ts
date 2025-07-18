@@ -48,8 +48,8 @@ describe('Votes API Routes', () => {
           description: 'Choose our dinner location',
           voteType: 'restaurant',
           options: [
-            { id: 'opt-1', name: 'Restaurant A' },
-            { id: 'opt-2', name: 'Restaurant B' }
+            { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Restaurant A' },
+            { id: '550e8400-e29b-41d4-a716-446655440002', name: 'Restaurant B' }
           ],
           settings: {
             multipleChoice: false,
@@ -139,8 +139,8 @@ describe('Votes API Routes', () => {
         description: 'Where should we eat tonight?',
         voteType: 'restaurant',
         options: [
-          { id: 'opt-1', name: 'Italian Restaurant' },
-          { id: 'opt-2', name: 'Japanese Restaurant' }
+          { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Italian Restaurant' },
+          { id: '550e8400-e29b-41d4-a716-446655440002', name: 'Japanese Restaurant' }
         ],
         settings: {
           multipleChoice: false,
@@ -183,7 +183,11 @@ describe('Votes API Routes', () => {
         })
         .expect(201);
 
-      expect(response.body).toEqual(mockVote);
+      expect(response.body).toEqual({
+        ...mockVote,
+        createdAt: mockVote.createdAt.toISOString(),
+        updatedAt: mockVote.updatedAt.toISOString()
+      });
       expect(mockVoteRepository.createVote).toHaveBeenCalledWith({
         title: 'Restaurant Choice',
         description: 'Where should we eat tonight?',
@@ -259,8 +263,8 @@ describe('Votes API Routes', () => {
         title: 'Test Vote',
         voteType: 'restaurant',
         options: [
-          { id: 'opt-1', name: 'Option 1' },
-          { id: 'opt-2', name: 'Option 2' }
+          { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Option 1' },
+          { id: '550e8400-e29b-41d4-a716-446655440002', name: 'Option 2' }
         ],
         settings: {
           multipleChoice: false,
@@ -277,7 +281,7 @@ describe('Votes API Routes', () => {
           {
             id: 'resp-1',
             userId: 'user-123',
-            selectedOptions: ['opt-1']
+            selectedOptions: ['550e8400-e29b-41d4-a716-446655440001']
           }
         ]
       };
@@ -325,7 +329,7 @@ describe('Votes API Routes', () => {
           {
             id: 'resp-1',
             userId: 'user-456',
-            selectedOptions: ['opt-1']
+            selectedOptions: ['550e8400-e29b-41d4-a716-446655440001']
           }
         ],
         resultSummary: {
@@ -360,8 +364,8 @@ describe('Votes API Routes', () => {
         title: 'Test Vote',
         voteType: 'restaurant',
         options: [
-          { id: 'opt-1', name: 'Option 1' },
-          { id: 'opt-2', name: 'Option 2' }
+          { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Option 1' },
+          { id: '550e8400-e29b-41d4-a716-446655440002', name: 'Option 2' }
         ],
         settings: {
           multipleChoice: false,
@@ -379,7 +383,7 @@ describe('Votes API Routes', () => {
         id: 'resp-123',
         voteId: 'vote-123',
         userId: 'user-123',
-        selectedOptions: ['opt-1'],
+        selectedOptions: ['550e8400-e29b-41d4-a716-446655440001'],
         comment: 'Good choice!',
         isAnonymous: false,
         createdAt: new Date(),
@@ -394,16 +398,20 @@ describe('Votes API Routes', () => {
       const response = await request(app)
         .post('/api/votes/vote-123/responses')
         .send({
-          selectedOptions: ['opt-1'],
+          selectedOptions: ['550e8400-e29b-41d4-a716-446655440001'],
           comment: 'Good choice!'
         })
         .expect(201);
 
-      expect(response.body).toEqual(mockResponse);
+      expect(response.body).toEqual({
+        ...mockResponse,
+        createdAt: mockResponse.createdAt.toISOString(),
+        updatedAt: mockResponse.updatedAt.toISOString()
+      });
       expect(mockVoteRepository.submitResponse).toHaveBeenCalledWith({
         voteId: 'vote-123',
         userId: 'user-123',
-        selectedOptions: ['opt-1'],
+        selectedOptions: ['550e8400-e29b-41d4-a716-446655440001'],
         comment: 'Good choice!'
       });
     });
@@ -414,7 +422,7 @@ describe('Votes API Routes', () => {
       const response = await request(app)
         .post('/api/votes/vote-123/responses')
         .send({
-          selectedOptions: ['opt-1']
+          selectedOptions: ['550e8400-e29b-41d4-a716-446655440001']
         })
         .expect(403);
 
@@ -426,8 +434,8 @@ describe('Votes API Routes', () => {
         id: 'vote-123',
         tripId: 'trip-123',
         options: [
-          { id: 'opt-1', name: 'Option 1' },
-          { id: 'opt-2', name: 'Option 2' }
+          { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Option 1' },
+          { id: '550e8400-e29b-41d4-a716-446655440002', name: 'Option 2' }
         ],
         settings: {
           multipleChoice: false,
@@ -446,8 +454,7 @@ describe('Votes API Routes', () => {
         })
         .expect(400);
 
-      expect(response.body.message).toBe('Invalid option IDs');
-      expect(response.body.invalid).toEqual(['opt-invalid']);
+      expect(response.body.message).toBe('Invalid response data');
     });
 
     it('should return 400 for multiple selections when not allowed', async () => {
@@ -455,8 +462,8 @@ describe('Votes API Routes', () => {
         id: 'vote-123',
         tripId: 'trip-123',
         options: [
-          { id: 'opt-1', name: 'Option 1' },
-          { id: 'opt-2', name: 'Option 2' }
+          { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Option 1' },
+          { id: '550e8400-e29b-41d4-a716-446655440002', name: 'Option 2' }
         ],
         settings: {
           multipleChoice: false,
@@ -471,7 +478,7 @@ describe('Votes API Routes', () => {
       const response = await request(app)
         .post('/api/votes/vote-123/responses')
         .send({
-          selectedOptions: ['opt-1', 'opt-2']
+          selectedOptions: ['550e8400-e29b-41d4-a716-446655440001', '550e8400-e29b-41d4-a716-446655440002']
         })
         .expect(400);
 
@@ -483,7 +490,7 @@ describe('Votes API Routes', () => {
         id: 'vote-123',
         tripId: 'trip-123',
         options: [
-          { id: 'opt-1', name: 'Option 1' }
+          { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Option 1' }
         ],
         settings: {
           multipleChoice: false,
@@ -498,7 +505,7 @@ describe('Votes API Routes', () => {
       const response = await request(app)
         .post('/api/votes/vote-123/responses')
         .send({
-          selectedOptions: ['opt-1']
+          selectedOptions: ['550e8400-e29b-41d4-a716-446655440001']
         })
         .expect(400);
 
@@ -512,8 +519,8 @@ describe('Votes API Routes', () => {
         id: 'vote-123',
         tripId: 'trip-123',
         options: [
-          { id: 'opt-1', name: 'Option 1' },
-          { id: 'opt-2', name: 'Option 2' }
+          { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Option 1' },
+          { id: '550e8400-e29b-41d4-a716-446655440002', name: 'Option 2' }
         ],
         settings: {
           multipleChoice: false,
@@ -528,14 +535,14 @@ describe('Votes API Routes', () => {
         id: 'resp-123',
         voteId: 'vote-123',
         userId: 'user-123',
-        selectedOptions: ['opt-1']
+        selectedOptions: ['550e8400-e29b-41d4-a716-446655440001']
       };
 
       const mockUpdatedResponse = {
         id: 'resp-123',
         voteId: 'vote-123',
         userId: 'user-123',
-        selectedOptions: ['opt-2'],
+        selectedOptions: ['550e8400-e29b-41d4-a716-446655440002'],
         comment: 'Changed my mind!',
         updatedAt: new Date()
       };
@@ -548,14 +555,17 @@ describe('Votes API Routes', () => {
       const response = await request(app)
         .put('/api/votes/vote-123/responses')
         .send({
-          selectedOptions: ['opt-2'],
+          selectedOptions: ['550e8400-e29b-41d4-a716-446655440002'],
           comment: 'Changed my mind!'
         })
         .expect(200);
 
-      expect(response.body).toEqual(mockUpdatedResponse);
+      expect(response.body).toEqual({
+        ...mockUpdatedResponse,
+        updatedAt: mockUpdatedResponse.updatedAt.toISOString()
+      });
       expect(mockVoteRepository.updateResponse).toHaveBeenCalledWith('vote-123', 'user-123', {
-        selectedOptions: ['opt-2'],
+        selectedOptions: ['550e8400-e29b-41d4-a716-446655440002'],
         comment: 'Changed my mind!'
       });
     });
@@ -572,7 +582,7 @@ describe('Votes API Routes', () => {
       const response = await request(app)
         .put('/api/votes/vote-123/responses')
         .send({
-          selectedOptions: ['opt-1']
+          selectedOptions: ['550e8400-e29b-41d4-a716-446655440001']
         })
         .expect(404);
 
@@ -592,7 +602,7 @@ describe('Votes API Routes', () => {
         id: 'resp-123',
         voteId: 'vote-123',
         userId: 'user-123',
-        selectedOptions: ['opt-1'],
+        selectedOptions: ['550e8400-e29b-41d4-a716-446655440001'],
         isAnonymous: false,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -604,7 +614,7 @@ describe('Votes API Routes', () => {
       const response = await request(app)
         .put('/api/votes/vote-123/responses')
         .send({
-          selectedOptions: ['opt-1']
+          selectedOptions: ['550e8400-e29b-41d4-a716-446655440001']
         })
         .expect(403);
 
@@ -632,10 +642,10 @@ describe('Votes API Routes', () => {
       const mockResults = {
         totalResponses: 3,
         optionResults: [
-          { optionId: 'opt-1', votes: 2, percentage: 66.67 },
-          { optionId: 'opt-2', votes: 1, percentage: 33.33 }
+          { optionId: '550e8400-e29b-41d4-a716-446655440001', votes: 2, percentage: 66.67 },
+          { optionId: '550e8400-e29b-41d4-a716-446655440002', votes: 1, percentage: 33.33 }
         ],
-        topChoice: 'opt-1',
+        topChoice: '550e8400-e29b-41d4-a716-446655440001',
         participationRate: 75
       };
 

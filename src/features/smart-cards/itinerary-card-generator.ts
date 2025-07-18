@@ -1,5 +1,7 @@
 import { MCPManager } from '../mcp/mcp-manager';
 import { TripRepository, Trip, Destination } from '../../models/trip';
+import { bookingSearchService } from '../booking/booking-search-service';
+import { BookingSearchParams, BookingOption } from '../booking/booking-provider';
 
 export interface ItineraryCard {
   id: string;
@@ -96,6 +98,15 @@ export interface PricingCardData {
     percentage: number;
     remaining: number;
     status: 'within_budget' | 'approaching_limit' | 'over_budget';
+  };
+  accommodationOptions?: {
+    bestValue: BookingOption;
+    luxury: BookingOption;
+    budget: BookingOption;
+    averagePrice: number;
+    priceRange: { min: number; max: number };
+    currency: string;
+    lastChecked: Date;
   };
 }
 
@@ -324,7 +335,7 @@ export class ItineraryCardGenerator {
       }
     }
     
-    // Get exchange rate data
+    // Get exchange rate data and initialize pricing
     try {
       const exchangeService = this.mcpManager.getService('exchangeRate');
       if (exchangeService && destination.country) {
@@ -336,19 +347,29 @@ export class ItineraryCardGenerator {
             to: localCurrency 
           });
           if (rateResponse.success && rateResponse.data) {
-            enrichedData.pricing = {
-              exchangeRate: {
-                localCurrency,
-                rate: rateResponse.data.rate,
-                convertedPrice: 100 * rateResponse.data.rate, // Example: $100 USD converted
-                baseCurrency: 'USD'
-              }
+            if (!enrichedData.pricing) enrichedData.pricing = {};
+            enrichedData.pricing.exchangeRate = {
+              localCurrency,
+              rate: rateResponse.data.rate,
+              convertedPrice: 100 * rateResponse.data.rate, // Example: $100 USD converted
+              baseCurrency: 'USD'
             };
           }
         }
       }
     } catch (error) {
       console.error('Error fetching exchange rate:', error);
+    }
+    
+    // Get hotel accommodation options
+    try {
+      const accommodationData = await this.getAccommodationOptions(destination, date);
+      if (accommodationData) {
+        if (!enrichedData.pricing) enrichedData.pricing = {};
+        enrichedData.pricing.accommodationOptions = accommodationData;
+      }
+    } catch (error) {
+      console.error('Error fetching accommodation data:', error);
     }
     
     // Add mock transport data (would be enhanced with real route planning)
@@ -393,6 +414,32 @@ export class ItineraryCardGenerator {
         action: destination.latitude && destination.longitude 
           ? `https://maps.google.com/?q=${destination.latitude},${destination.longitude}`
           : `https://maps.google.com/?q=${encodeURIComponent(destination.name)}`,
+        enabled: true
+      },
+      {
+        id: 'book_hotel',
+        type: 'booking',
+        label: 'Book Hotel',
+        icon: 'hotel',
+        action: `search_hotels_${destination.name}`,
+        enabled: true,
+        requiresAuth: true
+      },
+      {
+        id: 'book_flight',
+        type: 'booking',
+        label: 'Find Flights',
+        icon: 'flight',
+        action: `search_flights_${destination.name}`,
+        enabled: true,
+        requiresAuth: true
+      },
+      {
+        id: 'get_recommendations',
+        type: 'information',
+        label: 'Local Recommendations',
+        icon: 'recommendations',
+        action: `get_recommendations_${destination.name}`,
         enabled: true
       },
       {
@@ -464,6 +511,71 @@ export class ItineraryCardGenerator {
     } else {
       // Next day opening
       return { action: 'opens', time: `${openTime} tomorrow` };
+    }
+  }
+  
+  private async getAccommodationOptions(
+    destination: Destination, 
+    date: Date
+  ): Promise<PricingCardData['accommodationOptions'] | null> {
+    try {
+      // Determine destination name for hotel search
+      const destinationName = destination.city || destination.name;
+      
+      // Set check-in for the card date and check-out for next day
+      const checkIn = new Date(date);
+      const checkOut = new Date(date);
+      checkOut.setDate(checkOut.getDate() + 1);
+      
+      // Search for hotels using booking service
+      const searchParams: BookingSearchParams = {
+        type: 'hotel',
+        destination: destinationName,
+        checkIn,
+        checkOut,
+        guests: 2 // Default to 2 guests
+      };
+      
+      const searchResult = await bookingSearchService.search(searchParams);
+      
+      if (!searchResult.results || searchResult.results.length === 0) {
+        return null;
+      }
+      
+      // Categorize hotel options
+      const sortedByPrice = [...searchResult.results].sort((a, b) => a.price.amount - b.price.amount);
+      const sortedByRating = [...searchResult.results].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      
+      const budget = sortedByPrice[0]; // Cheapest option
+      const luxury = sortedByRating[0]; // Highest rated option
+      
+      // Find best value (good rating-to-price ratio)
+      const bestValue = searchResult.results.reduce((best, current) => {
+        const currentRatio = (current.rating || 0) / current.price.amount;
+        const bestRatio = (best.rating || 0) / best.price.amount;
+        return currentRatio > bestRatio ? current : best;
+      });
+      
+      // Calculate pricing statistics
+      const prices = searchResult.results.map(r => r.price.amount);
+      const averagePrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      const currency = searchResult.results[0]?.price.currency || 'USD';
+      
+      return {
+        bestValue,
+        luxury,
+        budget,
+        averagePrice: Math.round(averagePrice * 100) / 100,
+        priceRange: { min: minPrice, max: maxPrice },
+        currency,
+        lastChecked: new Date()
+      };
+      
+    } catch (error) {
+      console.error('Error searching for accommodation options:', error);
+      return null;
     }
   }
 }

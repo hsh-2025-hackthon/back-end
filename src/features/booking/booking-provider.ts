@@ -30,6 +30,7 @@ export interface BookingSearchResult {
   searchId: string;
   timestamp: Date;
   totalResults: number;
+  error?: string;
 }
 
 export interface BookingOption {
@@ -228,10 +229,12 @@ export abstract class BaseBookingProvider implements BookingProvider {
   
   protected apiKey: string;
   protected baseUrl: string;
+  protected enableCircuitBreaker: boolean;
   
-  constructor(config: { apiKey: string; baseUrl: string }) {
+  constructor(config: { apiKey: string; baseUrl: string; enableCircuitBreaker?: boolean }) {
     this.apiKey = config.apiKey;
     this.baseUrl = config.baseUrl;
+    this.enableCircuitBreaker = config.enableCircuitBreaker ?? true;
   }
   
   abstract search(params: BookingSearchParams): Promise<BookingSearchResult>;
@@ -247,19 +250,43 @@ export abstract class BaseBookingProvider implements BookingProvider {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
     
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    const requestOperation = async (): Promise<T> => {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+      
+      return response.json();
+    };
+    
+    // Use circuit breaker if enabled
+    if (this.enableCircuitBreaker) {
+      const { circuitBreakerManager } = await import('../../lib/circuit-breaker');
+      const circuitBreakerName = `${this.name}-${this.type}`;
+      
+      let circuitBreaker = circuitBreakerManager.getCircuitBreaker(circuitBreakerName);
+      if (!circuitBreaker) {
+        circuitBreaker = circuitBreakerManager.createCircuitBreaker(circuitBreakerName, {
+          failureThreshold: 3,
+          resetTimeout: 30000, // 30 seconds
+          monitoringPeriod: 60000, // 1 minute
+          successThreshold: 2,
+          timeout: 15000 // 15 seconds for booking APIs
+        });
+      }
+      
+      return circuitBreaker.execute(requestOperation);
+    } else {
+      return requestOperation();
     }
-    
-    return response.json();
   }
 }
