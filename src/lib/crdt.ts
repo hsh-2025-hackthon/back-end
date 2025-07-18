@@ -1,6 +1,5 @@
 import * as Y from 'yjs';
-import { WebPubSubServiceClient } from '@azure/web-pubsub';
-import { getWebPubSubServiceClient } from './webpubsub';
+import { broadcastToTrip } from './webpubsub';
 
 // Interface for document state
 interface TripDocument {
@@ -30,10 +29,9 @@ interface TripDocument {
 // CRDT service for managing collaborative trip editing
 export class CRDTService {
   private documents: Map<string, Y.Doc> = new Map();
-  private webPubSubClient: WebPubSubServiceClient;
 
   constructor() {
-    this.webPubSubClient = getWebPubSubServiceClient();
+    // No WebPubSub client needed anymore - using Redis Pub/Sub
   }
 
   // Get or create a Y.js document for a trip
@@ -218,9 +216,7 @@ export class CRDTService {
         timestamp: Date.now()
       };
 
-      await this.webPubSubClient.sendToAll(message, {
-        filter: `userId in groups('${tripId}')`
-      });
+      await broadcastToTrip(tripId, message);
     } catch (error) {
       console.error(`Error broadcasting update for trip ${tripId}:`, error);
     }
@@ -237,9 +233,7 @@ export class CRDTService {
         timestamp: Date.now()
       };
 
-      await this.webPubSubClient.sendToAll(message, {
-        filter: `userId in groups('${tripId}')`
-      });
+      await broadcastToTrip(tripId, message);
     } catch (error) {
       console.error(`Error broadcasting presence for trip ${tripId}:`, error);
     }

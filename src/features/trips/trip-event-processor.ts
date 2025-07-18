@@ -1,6 +1,5 @@
-import { ServiceBusReceiver, ServiceBusMessage } from '@azure/service-bus';
 import { CosmosClient } from '@azure/cosmos';
-import { getServiceBusClient } from '../../lib/servicebus';
+import { processEvents } from '../../lib/servicebus';
 import { TripRepository } from '../../models/trip';
 
 // Interface for events from the command side
@@ -14,7 +13,6 @@ interface EventData {
 }
 
 export class TripEventProcessor {
-  private receiver: ServiceBusReceiver | null = null;
   private isProcessing = false;
   private cosmosClient: CosmosClient | null = null;
   private database: any;
@@ -34,18 +32,12 @@ export class TripEventProcessor {
 
   async start(): Promise<void> {
     try {
-      const client = await getServiceBusClient();
-      this.receiver = client.createReceiver('trip-events');
       this.isProcessing = true;
-
       console.log('Starting trip event processor...');
       
-      // Process messages
-      this.receiver.subscribe({
-        processMessage: this.handleMessage.bind(this),
-        processError: this.handleError.bind(this)
-      });
-
+      // Start processing events using the new Bull Queue system
+      await processEvents(this.handleEvent.bind(this));
+      
       console.log('Trip event processor started');
     } catch (error) {
       console.error('Error starting trip event processor:', error);
@@ -54,17 +46,14 @@ export class TripEventProcessor {
   }
 
   async stop(): Promise<void> {
-    if (this.receiver && this.isProcessing) {
+    if (this.isProcessing) {
       this.isProcessing = false;
-      await this.receiver.close();
-      this.receiver = null;
       console.log('Trip event processor stopped');
     }
   }
 
-  private async handleMessage(message: ServiceBusMessage): Promise<void> {
+  private async handleEvent(eventData: EventData): Promise<void> {
     try {
-      const eventData = message.body as EventData;
       console.log(`Processing event: ${eventData.type} for trip ${eventData.aggregateId}`);
 
       switch (eventData.type) {

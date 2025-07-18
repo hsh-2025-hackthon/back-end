@@ -1,12 +1,20 @@
 import express from 'express';
+import { createServer } from 'http';
 import { runMigrations } from './lib/migrations';
 import { testConnection } from './config/database';
 import { tripEventProcessor } from './features/trips/trip-event-processor';
 import { mcpManager } from './features/mcp/mcp-manager';
 import { serviceHealthManager } from './lib/service-health';
+import { CollaborativeWebSocketServer } from './lib/websocket-server';
+import { initializeSearchTables } from './lib/search';
+import { checkRedisHealth } from './lib/redis';
 
 const app = express();
+const server = createServer(app);
 const port = process.env.PORT || 3000;
+
+// Initialize WebSocket server
+let wsServer: CollaborativeWebSocketServer;
 
 // Import routes
 import tripsRouter from './api/routes/trips';
@@ -152,6 +160,15 @@ async function startServer() {
     if (!dbConnected) {
       console.warn('Database connection failed - server will start but database features may not work');
     }
+
+    // Test Redis connection
+    console.log('Testing Redis connection...');
+    const redisHealth = await checkRedisHealth();
+    if (redisHealth.status === 'unhealthy') {
+      console.warn('Redis connection failed - real-time features may not work');
+    } else {
+      console.log(`Redis connected successfully (${redisHealth.latency}ms)`);
+    }
     
     // Run database migrations
     if (dbConnected) {
@@ -159,8 +176,13 @@ async function startServer() {
         console.log('Running database migrations...');
         await runMigrations();
         console.log('Database migrations completed');
+        
+        // Initialize search tables with pgvector
+        console.log('Initializing search tables...');
+        await initializeSearchTables();
+        console.log('Search tables initialized');
       } catch (error) {
-        console.error('Migration failed:', error);
+        console.error('Migration or search initialization failed:', error);
         console.warn('Server will start but database may not be properly initialized');
       }
     }
@@ -202,19 +224,34 @@ async function startServer() {
       console.error('Event processor failed to start:', error);
       console.warn('Server will start but CQRS events may not be processed');
     }
+
+    // Initialize WebSocket server
+    if (redisHealth.status === 'healthy') {
+      try {
+        console.log('Initializing WebSocket server...');
+        wsServer = new CollaborativeWebSocketServer(server);
+        console.log('WebSocket server initialized');
+      } catch (error) {
+        console.error('WebSocket server failed to start:', error);
+        console.warn('Server will start but real-time collaboration may not work');
+      }
+    }
     
     // Start server
-    app.listen(port, () => {
+    server.listen(port, () => {
       console.log(`\n🚀 Server is running on port ${port}`);
       console.log(`📚 Health check: http://localhost:${port}/health`);
       console.log(`🔍 Service health: http://localhost:${port}/health/services`);
       console.log(`🔧 MCP health: http://localhost:${port}/health/mcp`);
       console.log(`🔧 API endpoints: http://localhost:${port}/api/`);
+      console.log(`🔌 WebSocket endpoint: ws://localhost:${port}/ws`);
       
       if (process.env.NODE_ENV === 'development') {
         console.log('\n📝 Development mode - Additional info:');
         console.log(`   Environment: ${process.env.NODE_ENV}`);
         console.log(`   Database connected: ${dbConnected ? '✅' : '❌'}`);
+        console.log(`   Redis connected: ${redisHealth.status === 'healthy' ? '✅' : '❌'}`);
+        console.log(`   WebSocket server: ${wsServer ? '✅' : '❌'}`);
       }
     });
     
@@ -228,6 +265,9 @@ async function startServer() {
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received. Shutting down gracefully...');
   await tripEventProcessor.stop();
+  if (wsServer) {
+    await wsServer.close();
+  }
   mcpManager.shutdown();
   process.exit(0);
 });
@@ -235,6 +275,9 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   console.log('SIGINT received. Shutting down gracefully...');
   await tripEventProcessor.stop();
+  if (wsServer) {
+    await wsServer.close();
+  }
   mcpManager.shutdown();
   process.exit(0);
 });

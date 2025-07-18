@@ -1,5 +1,6 @@
-import { ServiceBusClient, ServiceBusMessage, ServiceBusReceiver } from "@azure/service-bus";
-import { getServiceBusConnectionString } from './keyvault';
+import { getRedisClient } from './redis';
+import Queue from 'bull';
+import { randomBytes } from 'crypto';
 
 interface CommandMessage {
   id: string;
@@ -19,64 +20,95 @@ interface EventMessage {
   version: number;
 }
 
-let sbClient: ServiceBusClient;
+// Bull Queue instances
+let commandQueue: Queue.Queue<CommandMessage>;
+let eventQueue: Queue.Queue<EventMessage>;
 
-export const getServiceBusClient = (): ServiceBusClient => {
-  if (!sbClient) {
-    const connectionString = getServiceBusConnectionString();
-    sbClient = new ServiceBusClient(connectionString);
+const getCommandQueue = (): Queue.Queue<CommandMessage> => {
+  if (!commandQueue) {
+    commandQueue = new Queue<CommandMessage>('trip-commands', {
+      redis: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+      },
+      defaultJobOptions: {
+        removeOnComplete: 10,
+        removeOnFail: 50,
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
+      },
+    });
   }
-  return sbClient;
+  return commandQueue;
 };
 
-// Command handling for CQRS pattern
+const getEventQueue = (): Queue.Queue<EventMessage> => {
+  if (!eventQueue) {
+    eventQueue = new Queue<EventMessage>('trip-events', {
+      redis: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+      },
+      defaultJobOptions: {
+        removeOnComplete: 10,
+        removeOnFail: 50,
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
+      },
+    });
+  }
+  return eventQueue;
+};
+
+// Command handling for CQRS pattern using Bull Queue
 export const sendCommand = async (command: CommandMessage): Promise<void> => {
-  const client = getServiceBusClient();
-  const sender = client.createSender('trip-commands');
+  const queue = getCommandQueue();
 
   try {
-    const message: ServiceBusMessage = {
-      body: command,
-      messageId: command.id,
-      contentType: 'application/json',
-      correlationId: command.aggregateId
-    };
-
-    await sender.sendMessages(message);
-    console.log(`Command ${command.type} sent for aggregate ${command.aggregateId}`);
+    await queue.add('process-command', command, {
+      jobId: command.id,
+      delay: 0,
+    });
+    console.log(`Command ${command.type} queued for aggregate ${command.aggregateId}`);
   } catch (error) {
     console.error('Failed to send command:', error);
     throw error;
-  } finally {
-    await sender.close();
   }
 };
 
-// Event publishing for event sourcing
+// Event publishing for event sourcing using Bull Queue and Redis Streams
 export const publishEvent = async (event: EventMessage): Promise<void> => {
-  const client = getServiceBusClient();
-  const sender = client.createSender('trip-events');
+  const redis = getRedisClient();
+  const queue = getEventQueue();
 
   try {
-    const message: ServiceBusMessage = {
-      body: event,
-      messageId: event.id,
-      contentType: 'application/json',
-      correlationId: event.aggregateId,
-      applicationProperties: {
-        eventType: event.type,
-        aggregateId: event.aggregateId,
-        version: event.version
-      }
-    };
+    // Add to Redis Stream for event sourcing
+    await redis.xadd(
+      `events:${event.aggregateId}`,
+      '*',
+      'id', event.id,
+      'type', event.type,
+      'data', JSON.stringify(event.data),
+      'timestamp', event.timestamp.toISOString(),
+      'version', event.version.toString()
+    );
 
-    await sender.sendMessages(message);
+    // Add to Bull Queue for processing
+    await queue.add('process-event', event, {
+      jobId: event.id,
+      delay: 0,
+    });
+
     console.log(`Event ${event.type} published for aggregate ${event.aggregateId}`);
   } catch (error) {
     console.error('Failed to publish event:', error);
     throw error;
-  } finally {
-    await sender.close();
   }
 };
 
@@ -118,75 +150,76 @@ export const publishTripEvent = async (
   await publishEvent(event);
 };
 
-// Command processor for handling incoming commands
+// Command processor for handling incoming commands using Bull Queue
 export const processCommands = async (processor: (command: CommandMessage) => Promise<void>): Promise<void> => {
-  const client = getServiceBusClient();
-  const receiver = client.createReceiver('trip-commands');
+  const queue = getCommandQueue();
 
-  receiver.subscribe({
-    processMessage: async (brokeredMessage) => {
-      try {
-        const command = brokeredMessage.body as CommandMessage;
-        console.log(`Processing command ${command.type} for aggregate ${command.aggregateId}`);
-        
-        await processor(command);
-        
-        // Complete the message to remove it from the queue
-        await receiver.completeMessage(brokeredMessage);
-      } catch (error) {
-        console.error('Error processing command:', error);
-        // Dead letter the message if processing fails
-        await receiver.deadLetterMessage(brokeredMessage, {
-          deadLetterReason: 'ProcessingError',
-          deadLetterErrorDescription: error instanceof Error ? error.message : 'Unknown error'
-        });
-      }
-    },
-    processError: async (args) => {
-      console.error('Error in command processor:', args.error);
+  queue.process('process-command', async (job) => {
+    const command = job.data;
+    console.log(`Processing command ${command.type} for aggregate ${command.aggregateId}`);
+    
+    try {
+      await processor(command);
+      console.log(`Command ${command.type} processed successfully`);
+    } catch (error) {
+      console.error('Error processing command:', error);
+      throw error; // Bull Queue will handle retries and failed jobs
     }
+  });
+
+  queue.on('failed', (job, err) => {
+    console.error(`Command job ${job.id} failed:`, err);
+  });
+
+  queue.on('error', (error) => {
+    console.error('Command queue error:', error);
   });
 };
 
-// Event processor for handling published events
+// Event processor for handling published events using Bull Queue
 export const processEvents = async (processor: (event: EventMessage) => Promise<void>): Promise<void> => {
-  const client = getServiceBusClient();
-  const receiver = client.createReceiver('trip-events');
+  const queue = getEventQueue();
 
-  receiver.subscribe({
-    processMessage: async (brokeredMessage) => {
-      try {
-        const event = brokeredMessage.body as EventMessage;
-        console.log(`Processing event ${event.type} for aggregate ${event.aggregateId}`);
-        
-        await processor(event);
-        
-        // Complete the message to remove it from the queue
-        await receiver.completeMessage(brokeredMessage);
-      } catch (error) {
-        console.error('Error processing event:', error);
-        // Dead letter the message if processing fails
-        await receiver.deadLetterMessage(brokeredMessage, {
-          deadLetterReason: 'ProcessingError',
-          deadLetterErrorDescription: error instanceof Error ? error.message : 'Unknown error'
-        });
-      }
-    },
-    processError: async (args) => {
-      console.error('Error in event processor:', args.error);
+  queue.process('process-event', async (job) => {
+    const event = job.data;
+    console.log(`Processing event ${event.type} for aggregate ${event.aggregateId}`);
+    
+    try {
+      await processor(event);
+      console.log(`Event ${event.type} processed successfully`);
+    } catch (error) {
+      console.error('Error processing event:', error);
+      throw error; // Bull Queue will handle retries and failed jobs
     }
+  });
+
+  queue.on('failed', (job, err) => {
+    console.error(`Event job ${job.id} failed:`, err);
+  });
+
+  queue.on('error', (error) => {
+    console.error('Event queue error:', error);
   });
 };
 
 
 // Utility function to generate unique IDs
 export const generateId = (): string => {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return `${Date.now()}-${randomBytes(4).toString('hex')}`;
 };
 
 // Graceful shutdown
 export const closeServiceBusClient = async (): Promise<void> => {
-  if (sbClient) {
-    await sbClient.close();
+  const promises = [];
+  
+  if (commandQueue) {
+    promises.push(commandQueue.close());
   }
+  
+  if (eventQueue) {
+    promises.push(eventQueue.close());
+  }
+  
+  await Promise.all(promises);
+  console.log('All Bull queues closed');
 };
