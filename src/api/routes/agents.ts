@@ -239,7 +239,7 @@ router.delete('/trips/:tripId/agents/sessions/:sessionId', requireAuth, async (r
       return res.status(403).json({ message: 'Access denied to this session' });
     }
 
-    const cancelled = agentCoordinator.cancelSession(sessionId);
+    const cancelled = await agentCoordinator.cancelSession(sessionId);
     
     if (cancelled) {
       res.json({ 
@@ -385,7 +385,7 @@ router.post('/agents/sessions/:sessionId/cancel', requireAuth, async (req: Reque
       return res.status(403).json({ message: 'Access denied to this session' });
     }
 
-    const cancelled = agentCoordinator.cancelSession(sessionId);
+    const cancelled = await agentCoordinator.cancelSession(sessionId);
     
     if (cancelled) {
       res.json({ 
@@ -417,6 +417,30 @@ router.get('/agents/sessions/:sessionId/logs', requireAuth, async (req: Request,
     const { sessionId } = req.params;
     const userId = req.user!.id;
 
+    // Parse query parameters
+    const level = req.query.level as 'debug' | 'info' | 'warn' | 'error' | undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+    const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+
+    // Validate query parameters
+    if (limit < 1 || limit > 1000) {
+      return res.status(400).json({ 
+        message: 'Limit must be between 1 and 1000' 
+      });
+    }
+
+    if (offset < 0) {
+      return res.status(400).json({ 
+        message: 'Offset must be non-negative' 
+      });
+    }
+
+    if (level && !['debug', 'info', 'warn', 'error'].includes(level)) {
+      return res.status(400).json({ 
+        message: 'Invalid log level. Must be one of: debug, info, warn, error' 
+      });
+    }
+
     const session = agentCoordinator.getSessionStatus(sessionId);
     
     if (!session) {
@@ -428,12 +452,17 @@ router.get('/agents/sessions/:sessionId/logs', requireAuth, async (req: Request,
       return res.status(403).json({ message: 'Access denied to this session' });
     }
 
-    const logs = agentCoordinator.getSessionLogs(sessionId);
+    const result = await agentCoordinator.getSessionLogs(sessionId, {
+      level,
+      limit,
+      offset
+    });
 
     res.json({
       sessionId,
-      logs,
-      totalLogs: logs.length,
+      logs: result.logs,
+      totalCount: result.totalCount,
+      hasMore: result.hasMore,
       sessionInfo: {
         status: session.status,
         currentStep: session.currentStep,
