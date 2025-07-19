@@ -116,6 +116,8 @@ app.get('/health/mcp', async (req, res) => {
 
 // API routes
 app.use('/api/auth', authRouter);
+// OAuth callback route (without /api prefix)
+app.use('/auth', authRouter);
 app.use('/api/trips', tripsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/collaboration', collaborationRouter);
@@ -137,7 +139,7 @@ app.use('/health', healthRouter);
 
 
 // Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ 
     message: 'Internal server error',
@@ -146,7 +148,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // 404 handler
-app.use('*splat', (req, res) => {
+app.use('*splat', (_req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
