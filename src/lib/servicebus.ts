@@ -24,6 +24,10 @@ interface EventMessage {
 let commandQueue: Queue.Queue<CommandMessage>;
 let eventQueue: Queue.Queue<EventMessage>;
 
+// Handler registration flags
+let commandHandlerRegistered = false;
+let eventHandlerRegistered = false;
+
 const getCommandQueue = (): Queue.Queue<CommandMessage> => {
   if (!commandQueue) {
     commandQueue = new Queue<CommandMessage>('trip-commands', {
@@ -154,6 +158,13 @@ export const publishTripEvent = async (
 export const processCommands = async (processor: (command: CommandMessage) => Promise<void>): Promise<void> => {
   const queue = getCommandQueue();
 
+  // Check if handler already registered to prevent duplicate registration
+  if (commandHandlerRegistered) {
+    console.log('Command processor handler already registered, skipping...');
+    return;
+  }
+  commandHandlerRegistered = true;
+
   queue.process('process-command', async (job) => {
     const command = job.data;
     console.log(`Processing command ${command.type} for aggregate ${command.aggregateId}`);
@@ -179,6 +190,13 @@ export const processCommands = async (processor: (command: CommandMessage) => Pr
 // Event processor for handling published events using Bull Queue
 export const processEvents = async (processor: (event: EventMessage) => Promise<void>): Promise<void> => {
   const queue = getEventQueue();
+
+  // Check if handler already registered to prevent duplicate registration
+  if (eventHandlerRegistered) {
+    console.log('Event processor handler already registered, skipping...');
+    return;
+  }
+  eventHandlerRegistered = true;
 
   queue.process('process-event', async (job) => {
     const event = job.data;

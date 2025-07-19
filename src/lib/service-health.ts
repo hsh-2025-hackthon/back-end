@@ -1,10 +1,7 @@
 import { mcpManager } from '../features/mcp/mcp-manager';
-import { getCosmosClient } from './cosmos';
+
 import { getOpenAIClient } from './openai';
 import { getMapsRouteClient } from './azure-maps';
-import { EventHubProducerClient } from '@azure/event-hubs';
-import { SearchClient, AzureKeyCredential } from '@azure/search-documents';
-import { WebPubSubServiceClient } from '@azure/web-pubsub';
 
 export interface ServiceHealth {
   service: string;
@@ -32,14 +29,14 @@ export class ServiceHealthManager {
     return Date.now() - health.timestamp.getTime() < this.CACHE_TTL;
   }
 
-  private async checkAzureOpenAI(): Promise<ServiceHealth> {
+  private async checkOpenAI(): Promise<ServiceHealth> {
     const startTime = Date.now();
     try {
-      if (!process.env.AZURE_OPENAI_ENDPOINT || !process.env.AZURE_OPENAI_KEY) {
+      if (!process.env.OPENAI_API_KEY) {
         return {
-          service: 'Azure OpenAI',
+          service: 'OpenAI',
           status: 'unhealthy',
-          message: 'Missing environment variables',
+          message: 'Missing OPENAI_API_KEY environment variable',
           timestamp: new Date()
         };
       }
@@ -47,20 +44,20 @@ export class ServiceHealthManager {
       const client = getOpenAIClient();
       // Test with a simple completion request
       await client.chat.completions.create({
-        model: process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4',
+        model: 'gpt-4o',
         messages: [{ role: 'user', content: 'test' }],
         max_tokens: 1
       });
 
       return {
-        service: 'Azure OpenAI',
+        service: 'OpenAI',
         status: 'healthy',
         responseTime: Date.now() - startTime,
         timestamp: new Date()
       };
     } catch (error) {
       return {
-        service: 'Azure OpenAI',
+        service: 'OpenAI',
         status: 'unhealthy',
         message: error instanceof Error ? error.message : 'Unknown error',
         responseTime: Date.now() - startTime,
@@ -69,149 +66,10 @@ export class ServiceHealthManager {
     }
   }
 
-  private async checkCosmosDB(): Promise<ServiceHealth> {
-    const startTime = Date.now();
-    try {
-      if (!process.env.COSMOS_DB_ENDPOINT) {
-        return {
-          service: 'Cosmos DB',
-          status: 'unhealthy',
-          message: 'Missing COSMOS_DB_ENDPOINT environment variable',
-          timestamp: new Date()
-        };
-      }
+  
 
-      const client = getCosmosClient();
-      // Simple health check - list databases
-      await client.databases.readAll().fetchAll();
 
-      return {
-        service: 'Cosmos DB',
-        status: 'healthy',
-        responseTime: Date.now() - startTime,
-        timestamp: new Date()
-      };
-    } catch (error) {
-      return {
-        service: 'Cosmos DB',
-        status: 'unhealthy',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        responseTime: Date.now() - startTime,
-        timestamp: new Date()
-      };
-    }
-  }
 
-  private async checkEventHubs(): Promise<ServiceHealth> {
-    const startTime = Date.now();
-    try {
-      const connectionString = process.env.AZURE_EVENTHUBS_CONNECTION_STRING;
-      if (!connectionString || connectionString.includes('placeholder')) {
-        return {
-          service: 'Event Hubs',
-          status: 'unhealthy',
-          message: 'Missing or invalid AZURE_EVENTHUBS_CONNECTION_STRING',
-          timestamp: new Date()
-        };
-      }
-
-      const eventHubName = process.env.AZURE_EVENTHUB_NAME || 'travel-events';
-      const producer = new EventHubProducerClient(connectionString, eventHubName);
-      
-      // Simple connectivity test
-      await producer.getEventHubProperties();
-      await producer.close();
-
-      return {
-        service: 'Event Hubs',
-        status: 'healthy',
-        responseTime: Date.now() - startTime,
-        timestamp: new Date()
-      };
-    } catch (error) {
-      return {
-        service: 'Event Hubs',
-        status: 'unhealthy',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        responseTime: Date.now() - startTime,
-        timestamp: new Date()
-      };
-    }
-  }
-
-  private async checkAzureSearch(): Promise<ServiceHealth> {
-    const startTime = Date.now();
-    try {
-      const endpoint = process.env.AZURE_SEARCH_ENDPOINT;
-      const apiKey = process.env.AZURE_SEARCH_ADMIN_KEY;
-      
-      if (!endpoint || !apiKey || endpoint.includes('placeholder')) {
-        return {
-          service: 'Azure Search',
-          status: 'unhealthy',
-          message: 'Missing Azure Search configuration',
-          timestamp: new Date()
-        };
-      }
-
-      const indexName = process.env.AZURE_SEARCH_INDEX || 'travel-index';
-      const searchClient = new SearchClient(endpoint, indexName, new AzureKeyCredential(apiKey));
-      
-      // Simple search test
-      await searchClient.getDocumentsCount();
-
-      return {
-        service: 'Azure Search',
-        status: 'healthy',
-        responseTime: Date.now() - startTime,
-        timestamp: new Date()
-      };
-    } catch (error) {
-      return {
-        service: 'Azure Search',
-        status: 'unhealthy',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        responseTime: Date.now() - startTime,
-        timestamp: new Date()
-      };
-    }
-  }
-
-  private async checkWebPubSub(): Promise<ServiceHealth> {
-    const startTime = Date.now();
-    try {
-      const connectionString = process.env.AZURE_WEBPUBSUB_CONNECTION_STRING;
-      if (!connectionString || connectionString.includes('placeholder')) {
-        return {
-          service: 'Web PubSub',
-          status: 'unhealthy',
-          message: 'Missing AZURE_WEBPUBSUB_CONNECTION_STRING',
-          timestamp: new Date()
-        };
-      }
-
-      const hubName = process.env.AZURE_WEBPUBSUB_HUB_NAME || 'travel-hub';
-      const serviceClient = new WebPubSubServiceClient(connectionString, hubName);
-      
-      // Simple connectivity test
-      await serviceClient.groupExists('test-group');
-
-      return {
-        service: 'Web PubSub',
-        status: 'healthy',
-        responseTime: Date.now() - startTime,
-        timestamp: new Date()
-      };
-    } catch (error) {
-      return {
-        service: 'Web PubSub',
-        status: 'unhealthy',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        responseTime: Date.now() - startTime,
-        timestamp: new Date()
-      };
-    }
-  }
 
   private async checkAzureMaps(): Promise<ServiceHealth> {
     const startTime = Date.now();
@@ -271,11 +129,7 @@ export class ServiceHealthManager {
 
   public async checkAllServices(): Promise<ServiceHealth[]> {
     const services = [
-      this.checkAzureOpenAI(),
-      this.checkCosmosDB(),
-      this.checkEventHubs(),
-      this.checkAzureSearch(),
-      this.checkWebPubSub(),
+      this.checkOpenAI(),
       this.checkAzureMaps(),
       this.checkMCPServices()
     ];
@@ -292,8 +146,7 @@ export class ServiceHealthManager {
         }
       } else {
         const serviceNames = [
-          'Azure OpenAI', 'Cosmos DB', 'Event Hubs', 
-          'Azure Search', 'Web PubSub', 'Azure Maps', 'MCP Services'
+          'OpenAI', 'Azure Maps', 'MCP Services'
         ];
         healthChecks.push({
           service: serviceNames[index] || 'Unknown Service',
@@ -331,8 +184,7 @@ export class ServiceHealthManager {
 
     // Check if we have recent cached data for all services
     const allServices = [
-      'Azure OpenAI', 'Cosmos DB', 'Event Hubs', 
-      'Azure Search', 'Web PubSub', 'Azure Maps'
+      'OpenAI', 'Azure Maps'
     ];
     
     const cachedResults = allServices.map(service => this.healthCache.get(service))

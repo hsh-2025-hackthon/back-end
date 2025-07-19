@@ -1,5 +1,5 @@
 import { getOpenAIClient } from '../../lib/openai';
-import { AzureOpenAI } from 'openai';
+import { OpenAI } from 'openai';
 
 export interface AgentContext {
   tripId: string;
@@ -27,7 +27,7 @@ export interface AgentCapability {
 }
 
 export abstract class BaseAgent {
-  protected openaiClient: AzureOpenAI;
+  protected openaiClient: OpenAI;
   protected agentName: string;
   protected version: string;
   protected capabilities: AgentCapability[];
@@ -84,7 +84,7 @@ export abstract class BaseAgent {
   ): Promise<any> {
     try {
       const response = await this.openaiClient.chat.completions.create({
-        model: process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4',
+        model: 'gpt-4o',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }

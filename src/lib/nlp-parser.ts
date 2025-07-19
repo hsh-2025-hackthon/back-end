@@ -83,7 +83,7 @@ export class NLPParserService {
       `;
 
       const response = await this.openaiClient.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4o",
         messages: [
           { 
             role: "system", 
@@ -179,7 +179,7 @@ export class NLPParserService {
       `;
 
       const response = await this.openaiClient.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4o",
         messages: [
           { 
             role: "system", 
@@ -342,7 +342,7 @@ export class NLPParserService {
       `;
 
       const response = await this.openaiClient.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4o",
         messages: [
           { 
             role: "system", 
@@ -390,7 +390,7 @@ export class NLPParserService {
       `;
 
       const response = await this.openaiClient.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4o",
         messages: [
           { 
             role: "system", 

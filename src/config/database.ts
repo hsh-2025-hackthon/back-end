@@ -17,7 +17,7 @@ const getDatabaseConfig = (): DatabaseConfig => {
     database: process.env.POSTGRES_DB || 'travel_planning',
     user: process.env.POSTGRES_USER || 'postgres',
     password: process.env.POSTGRES_PASSWORD,
-    ssl: process.env.NODE_ENV === 'production'
+    ssl: false
   };
 };
 

@@ -1,28 +1,23 @@
-import { AzureOpenAI } from "openai";
+import { OpenAI } from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 
-const getEndpoint = (): string => {
-  return process.env.AZURE_OPENAI_ENDPOINT || "https://placeholder.openai.azure.com/";
-};
-
 const getApiKey = (): string => {
-  return process.env.AZURE_OPENAI_KEY || "placeholder";
+  return process.env.OPENAI_API_KEY || "placeholder";
 };
 
-let client: AzureOpenAI;
+let client: OpenAI;
 
-export const getOpenAIClient = (): AzureOpenAI => {
+export const getOpenAIClient = (): OpenAI => {
     if (!client) {
-        const endpoint = getEndpoint();
         const apiKey = getApiKey();
-        client = new AzureOpenAI({ endpoint, apiKey, apiVersion: "2024-05-01-preview" });
+        client = new OpenAI({ apiKey });
     }
     return client;
 };
 
 export const generateItinerary = async (destination: string, duration: number) => {
     const client = getOpenAIClient();
-    const deployment = "gpt-4";
+    const model = "gpt-4o";
     const messages: ChatCompletionMessageParam[] = [
         { role: "system", content: "You are a helpful travel assistant." },
         { role: "user", content: `Generate a ${duration}-day itinerary for a trip to ${destination}.` },
@@ -30,7 +25,7 @@ export const generateItinerary = async (destination: string, duration: number) =
 
     try {
         const result = await client.chat.completions.create({
-            model: deployment,
+            model: model,
             messages: messages,
         });
         return result.choices[0].message?.content;

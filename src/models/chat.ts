@@ -359,6 +359,47 @@ export class ChatRepository {
     await db.query(query, [messageId]);
   }
   
+  static async getMessageById(messageId: string): Promise<ChatMessage | null> {
+    const db = getDatabase();
+    const query = `
+      SELECT cm.id, cm.room_id as "roomId", cm.user_id as "userId", cm.content, 
+             cm.message_type as "messageType", cm.metadata, cm.replied_to as "repliedTo",
+             cm.edited_at as "editedAt", cm.is_deleted as "isDeleted",
+             cm.created_at as "createdAt", cm.updated_at as "updatedAt",
+             u.name, u.email
+      FROM chat_messages cm
+      JOIN users u ON cm.user_id = u.id
+      WHERE cm.id = $1 AND cm.is_deleted = FALSE
+    `;
+    
+    const result = await db.query(query, [messageId]);
+    if (result.rows.length === 0) {
+      return null;
+    }
+    
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      roomId: row.roomId,
+      userId: row.userId,
+      content: row.content,
+      messageType: row.messageType,
+      metadata: row.metadata,
+      repliedTo: row.repliedTo,
+      editedAt: row.editedAt,
+      isDeleted: row.isDeleted,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      user: {
+        id: row.userId,
+        name: row.name,
+        email: row.email,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    };
+  }
+
   static async searchMessages(roomId: string, searchQuery: string): Promise<ChatMessage[]> {
     const db = getDatabase();
     const query = `

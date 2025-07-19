@@ -189,16 +189,3 @@ export class TripReadModelRepository {
   }
 }
 
-export const testCosmosConnection = async (): Promise<boolean> => {
-  try {
-    const container = await getCosmosContainer();
-    
-    // Test with a simple query
-    const { resources } = await container.items.query('SELECT VALUE COUNT(1) FROM c').fetchAll();
-    console.log('Cosmos DB connection successful. Document count:', resources[0]);
-    return true;
-  } catch (error) {
-    console.error('Cosmos DB connection failed:', error);
-    return false;
-  }
-};

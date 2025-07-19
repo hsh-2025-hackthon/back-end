@@ -269,20 +269,4 @@ export class TripEventProcessor {
 // Export a singleton instance
 export const tripEventProcessor = new TripEventProcessor();
 
-// Auto-start if not in test environment
-if (process.env.NODE_ENV !== 'test') {
-  tripEventProcessor.start().catch(console.error);
-  
-  // Graceful shutdown
-  process.on('SIGINT', async () => {
-    console.log('Received SIGINT, shutting down event processor...');
-    await tripEventProcessor.stop();
-    process.exit(0);
-  });
-  
-  process.on('SIGTERM', async () => {
-    console.log('Received SIGTERM, shutting down event processor...');
-    await tripEventProcessor.stop();
-    process.exit(0);
-  });
-}
+// Note: Event processor is started manually from server.ts to avoid duplicate handler registration

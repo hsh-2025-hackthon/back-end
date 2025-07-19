@@ -4,7 +4,7 @@ services:
   app:
     build: .
     ports:
-      - "80:3000"
+      - "3000:3000"
     env_file:
       - .env
     environment:
@@ -17,6 +17,7 @@ services:
       - POSTGRES_PASSWORD=password
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,7 +31,7 @@ services:
       start_period: 40s
 
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     environment:
       POSTGRES_DB: travel_planning
       POSTGRES_USER: postgres
